@@ -10,7 +10,7 @@ from vnpy.trader.engine import MainEngine
 from vnpy.app.paper_account import PaperAccountApp
 
 from vnpy.gateway.ctp import CtpGateway
-from vnpy_ctastrategy import CtaStrategyApp
+from vnpy_ctastrategy import CtaStrategyApp, CtaEngine
 from vnpy_ctastrategy.base import EVENT_CTA_LOG
 
 
@@ -63,7 +63,14 @@ def run_child():
     event_engine = EventEngine()
     main_engine = MainEngine(event_engine)  # 主引擎是事件驱动的，因此只有event_engine这一个入参
     main_engine.add_gateway(CtpGateway)  # 主引擎添加数据接口
-    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加PaperAccountApp，即创建了cta_engine
+    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加PaperAccountApp，即创建了paper_engine
+    cta_engine = main_engine.add_app(CtaStrategyApp)
+
+    paper_engine.trade_slippage = 0.2
+    paper_engine.timer_interval = 3
+    paper_engine.instant_trade = False
+    paper_engine.save_setting()
+
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
 
     log_engine = main_engine.get_engine("log")
@@ -72,15 +79,12 @@ def run_child():
 
     main_engine.connect(ctp_setting, "CTP")
     main_engine.write_log("连接CTP接口")
-
     sleep(10)
 
     cta_engine.init_engine()
-
     main_engine.write_log("CTA引擎初始化完成")
 
     HNstrategy_name = "终极震荡指标策略"
-
     cta_engine.init_strategy(HNstrategy_name)
     sleep(20)   # Leave enough time to complete strategy initialization
     
