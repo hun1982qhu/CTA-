@@ -3,7 +3,6 @@ import sys
 from time import sleep
 from datetime import datetime, time
 from logging import INFO
-from vnpy.app import paper_account
 
 from vnpy.event import EventEngine
 from vnpy.trader.setting import SETTINGS
@@ -21,14 +20,13 @@ SETTINGS["log.console"] = True  # 是否将日志在CMD中逐条打出
 
 
 ctp_setting = {
-    "用户名": "167465",
-    "密码": "hun829248",
-    "经纪商代码": "9999",
-    "交易服务器": "180.168.146.187:10202",
-    "行情服务器": "180.168.146.187:10212",
-    "产品名称": "simnow_client_test",
-    "授权编码": "0000000000000000",
-    "产品信息": "simnow_client_test"
+    "用户名": "120253681",
+    "密码": "82924811",
+    "经纪商代码": "66666",
+    "交易服务器": "123.124.247.8:43205",
+    "行情服务器": "123.124.247.8:43213",
+    "产品名称": "client_VNTrader_2.1.3",
+    "授权编码": "T4CQU8CGYZLM5M2J"
 }
 
 
@@ -65,7 +63,7 @@ def run_child():
     event_engine = EventEngine()
     main_engine = MainEngine(event_engine)  # 主引擎是事件驱动的，因此只有event_engine这一个入参
     main_engine.add_gateway(CtpGateway)  # 主引擎添加数据接口
-    cta_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加CtaStrategyApp，即创建了cta_engine
+    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加PaperAccountApp，即创建了cta_engine
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
 
     log_engine = main_engine.get_engine("log")
