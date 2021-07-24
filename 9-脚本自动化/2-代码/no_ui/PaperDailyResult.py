@@ -1,3 +1,4 @@
+#%%
 from collections import defaultdict
 from datetime import date, datetime
 from pathlib import Path
@@ -125,7 +126,7 @@ class PnlCaculate:
         total_row = self.trade_record_sheet.max_row
         total_column = self.trade_record_sheet.max_column
 
-        for i in range(2, total_column+1):
+        for i in range(2, total_row+1):
 
             trade_datetime = self.trade_record_sheet.cell(i, 8).value
             trade_datetime = trade_datetime.split("+")[0]
@@ -141,6 +142,8 @@ class PnlCaculate:
                     datetime=datetime.strptime(trade_datetime, "%Y-%m-%d %H:%M:%S.%f")
                 )
 
+            print(trade.datetime)
+
             self.trades[trade.tradeid] = trade
 
     def calculate_result(self):
@@ -150,7 +153,7 @@ class PnlCaculate:
             
             if trade.direction == "Direction.LONG":
     
-                trade_money = (trade.price + 0.2) * trade.volume * 10 - trade.volume * 0.1
+                trade_money = (trade.price + 0.2) * trade.volume * 10 + trade.volume * 0.1
 
                 self.pnl_list.append(-trade_money)
 
@@ -170,5 +173,3 @@ class PnlCaculate:
 pnl = PnlCaculate("papertest1")
 pnl.get_trade_record()
 pnl.calculate_result()
-
-    

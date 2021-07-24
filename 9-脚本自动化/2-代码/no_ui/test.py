@@ -60,67 +60,56 @@ def run_child():
     """
     SETTINGS["log.file"] = True
 
-    # 创建主引擎
     event_engine = EventEngine()
     main_engine = MainEngine(event_engine)  # 主引擎是事件驱动的，因此只有event_engine这一个入参
     main_engine.add_gateway(CtpGateway)  # 主引擎添加数据接口
     cta_engine = main_engine.add_app(CtaStrategyApp)  # 主引擎添加CtaStrategyApp，即创建了cta_engine
-    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加CtaStrategyApp，即创建了paper_engine
+    paper_engine = main_engine.add_app(PaperAccountApp)
 
-    # paper_engine.trade_slippage = 0.2
-    # paper_engine.timer_interval = 3
-    # paper_engine.instant_trade = False
-    # paper_engine.save_setting()
+    paper_engine.trade_slippage = 0.2
+    paper_engine.timer_interval = 3
+    paper_engine.instant_trade = False
+    paper_engine.save_setting()
 
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
 
-    # 创建日志引擎
     log_engine = main_engine.get_engine("log")
     event_engine.register(EVENT_CTA_LOG, log_engine.process_log_event)
     main_engine.write_log("注册日志事件监听")
 
-    # 连接CTP服务器
     main_engine.connect(ctp_setting, "CTP")
     main_engine.write_log("连接CTP接口")
+
     sleep(10)
 
-    # 初始化CTA引擎
     cta_engine.init_engine()
+
     main_engine.write_log("CTA引擎初始化完成")
 
-    # 初始化交易策略
-    HNstrategy_name = "papertest1"
+    HNstrategy_name = "终极震荡指标策略"
+
     cta_engine.init_strategy(HNstrategy_name)
     sleep(20)   # Leave enough time to complete strategy initialization
+    
     main_engine.write_log(f"{HNstrategy_name}完成初始化")
 
-    # 启动交易策略
     cta_engine.start_strategy(HNstrategy_name)
+
     main_engine.write_log(f"{HNstrategy_name}已启动")
+
     current_time = datetime.now().time()
-    
-    main_engine.send_email(
-        "终极震荡指标策略启动", 
-        f"trading started, {current_time}", 
-        SETTINGS["email.receiver"])
+
+    main_engine.send_email("终极震荡指标策略启动", f"trading started, {current_time}", SETTINGS["email.receiver"])
 
     while True:
         sleep(10)
 
         trading = check_trading_period()
         if not trading:
-            
             print("关闭子进程")
-            
             current_time = datetime.now().time()
-            
-            main_engine.send_email(
-                "终极震荡指标策略关闭", 
-                f"trading closed, {current_time}", 
-                SETTINGS["email.receiver"])
-            
+            main_engine.send_email("终极震荡指标策略关闭", f"trading closed, {current_time}", SETTINGS["email.receiver"])
             main_engine.close()
-            
             sys.exit(0)
 
 
