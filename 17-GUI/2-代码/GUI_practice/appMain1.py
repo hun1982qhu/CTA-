@@ -7,7 +7,7 @@ app = QtWidgets.QApplication(sys.argv)
 baseWidget = QtWidgets.QWidget()
 
 ui = ui_FormHello.Ui_FormHello()
-ui.setupUi(baseWidget)
+ui.setupUi(baseWidget)  # 创建各组件的窗体容器
 
 baseWidget.show()
 

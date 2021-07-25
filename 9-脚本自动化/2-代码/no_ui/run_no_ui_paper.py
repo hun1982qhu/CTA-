@@ -58,21 +58,22 @@ def run_child():
     """
     Running in the child process.
     """
+
     SETTINGS["log.file"] = True
 
     # 创建主引擎
-    event_engine = EventEngine()
+    event_engine = EventEngine()  # 创建时间引擎
     main_engine = MainEngine(event_engine)  # 主引擎是事件驱动的，因此只有event_engine这一个入参
-    main_engine.add_gateway(CtpGateway)  # 主引擎添加数据接口
+    main_engine.add_gateway(CtpGateway)  # 主引擎添加CTP服务器接口
     cta_engine = main_engine.add_app(CtaStrategyApp)  # 主引擎添加CtaStrategyApp，即创建了cta_engine
-    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加CtaStrategyApp，即创建了paper_engine
+    paper_engine = main_engine.add_app(PaperAccountApp)  # 主引擎添加PaperAccountApp，即创建了paper_engine
 
     # paper_engine.trade_slippage = 0.2
     # paper_engine.timer_interval = 3
     # paper_engine.instant_trade = False
     # paper_engine.save_setting()
 
-    main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
+    main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了主引擎
 
     # 创建日志引擎
     log_engine = main_engine.get_engine("log")
@@ -99,8 +100,9 @@ def run_child():
     main_engine.write_log(f"{HNstrategy_name}已启动")
     current_time = datetime.now().time()
     
+    # 发送邮件通知
     main_engine.send_email(
-        "终极震荡指标策略启动", 
+        "终极震荡指标策略-papertest1启动", 
         f"trading started, {current_time}", 
         SETTINGS["email.receiver"])
 
