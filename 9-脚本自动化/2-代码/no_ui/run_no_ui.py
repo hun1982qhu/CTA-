@@ -30,7 +30,7 @@ ctp_setting = {
 }
 
 
-# Chinese futures market trading period (day/night)
+# 中国期货市场交易时段（日盘/夜盘）
 DAY_START = time(8, 45)
 DAY_END = time(15, 1)
 
@@ -60,23 +60,25 @@ def run_child():
     """
     SETTINGS["log.file"] = True
 
+    # 创建主引擎
     event_engine = EventEngine()
     main_engine = MainEngine(event_engine)  # 主引擎是事件驱动的，因此只有event_engine这一个入参
     main_engine.add_gateway(CtpGateway)  # 主引擎添加数据接口
     cta_engine = main_engine.add_app(CtaStrategyApp)  # 主引擎添加CtaStrategyApp，即创建了cta_engine
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
 
+    # 创建日志引擎
     log_engine = main_engine.get_engine("log")
     event_engine.register(EVENT_CTA_LOG, log_engine.process_log_event)
     main_engine.write_log("注册日志事件监听")
 
+    # 连接CTP服务器
     main_engine.connect(ctp_setting, "CTP")
     main_engine.write_log("连接CTP接口")
-
     sleep(10)
 
+    # CTA引擎初始化
     cta_engine.init_engine()
-
     main_engine.write_log("CTA引擎初始化完成")
 
     HNstrategy_name = "终极震荡指标策略"
