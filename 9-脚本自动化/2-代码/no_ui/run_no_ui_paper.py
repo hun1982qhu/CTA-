@@ -75,7 +75,7 @@ def run_child():
 
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了主引擎
 
-    # 创建日志引擎
+    # 获取日志引擎。主引擎初始化过程中已经创建了日志引擎，因此只需要获取即可。
     log_engine = main_engine.get_engine("log")
     event_engine.register(EVENT_CTA_LOG, log_engine.process_log_event)
     main_engine.write_log("注册日志事件监听")
