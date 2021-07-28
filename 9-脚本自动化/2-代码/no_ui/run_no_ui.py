@@ -67,7 +67,7 @@ def run_child():
     cta_engine = main_engine.add_app(CtaStrategyApp)  # 主引擎添加CtaStrategyApp，即创建了cta_engine
     main_engine.write_log("主引擎创建成功")  # 上述步骤全部完成即创建了一个用户所需要的的主引擎
 
-    # 创建日志引擎
+    # 获取日志引擎。主引擎初始化过程中已经创建了日志引擎，因此只需要获取即可
     log_engine = main_engine.get_engine("log")
     event_engine.register(EVENT_CTA_LOG, log_engine.process_log_event)
     main_engine.write_log("注册日志事件监听")
@@ -81,19 +81,27 @@ def run_child():
     cta_engine.init_engine()
     main_engine.write_log("CTA引擎初始化完成")
 
+    # 初始化某指定策略
     HNstrategy_name = "终极震荡指标策略"
-
     cta_engine.init_strategy(HNstrategy_name)
     sleep(20)   # Leave enough time to complete strategy initialization
-    
     main_engine.write_log(f"{HNstrategy_name}完成初始化")
 
-    cta_engine.start_strategy(HNstrategy_name)
+    # 批量初始化strategies文件夹中的所有交易策略
+    # cta_engine.init_all_strategies()
+    # sleep(60)   # Leave enough time to complete strategy initialization
+    # main_engine.write_log("CTA策略全部初始化")
 
+    # 启动某指定策略
+    cta_engine.start_strategy(HNstrategy_name)
     main_engine.write_log(f"{HNstrategy_name}已启动")
 
-    current_time = datetime.now().time()
+    # 批量启动strategies文件夹中的所有交易策略
+    # cta_engine.start_all_strategies()
+    # main_engine.write_log("CTA策略全部启动")
 
+    # 发送邮件通知
+    current_time = datetime.now().time()
     main_engine.send_email("终极震荡指标策略启动", f"trading started, {current_time}", SETTINGS["email.receiver"])
 
     while True:
