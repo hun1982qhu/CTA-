@@ -124,9 +124,9 @@ class PnlCaculate:
             self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
 
         total_row = self.trade_record_sheet.max_row
-        total_column = self.trade_record_sheet.max_column
+        # total_column = self.trade_record_sheet.max_column
 
-        for i in range(2, total_row+1):
+        for i in range(2, total_row + 1):
 
             trade_datetime = self.trade_record_sheet.cell(i, 8).value
             trade_datetime = trade_datetime.split("+")[0]
@@ -150,24 +150,36 @@ class PnlCaculate:
         """"""
         # Add trade data into daily reuslt.
         for trade in self.trades.values():
-            
+
             if trade.direction == "Direction.LONG":
     
-                trade_money = (trade.price + 0.2) * trade.volume * 10 + trade.volume * 0.1
+                trade_money = trade.price * trade.volume * 10 + trade.volume * 0.1
 
                 self.pnl_list.append(-trade_money)
 
             elif trade.direction == "Direction.SHORT":
 
-                trade_money = (trade.price - 0.2) * trade.volume * 10 - trade.volume * 0.1
+                trade_money = trade.price * trade.volume * 10 - trade.volume * 0.1
 
                 self.pnl_list.append(trade_money)
+            
+            # if trade.direction == "Direction.LONG":
+    
+            #     trade_money = (trade.price + 0.2) * trade.volume * 10 + trade.volume * 0.1
 
-        print(self.pnl_list)
+            #     self.pnl_list.append(-trade_money)
+
+            # elif trade.direction == "Direction.SHORT":
+
+            #     trade_money = (trade.price - 0.2) * trade.volume * 10 - trade.volume * 0.1
+
+            #     self.pnl_list.append(trade_money)
+
+        print(f"self.pnl_list:{self.pnl_list}")
  
         self.total_pnl = sum(self.pnl_list)
 
-        print(self.total_pnl)
+        print(f"net_profit:{self.total_pnl}")
 
 
 pnl = PnlCaculate("papertest1")
