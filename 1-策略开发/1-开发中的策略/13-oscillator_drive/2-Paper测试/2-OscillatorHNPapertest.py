@@ -4,9 +4,9 @@ import openpyxl
 
 from openpyxl.utils import get_column_letter
 from pathlib import Path
-from typing import Callable
 from datetime import time as time1
 from datetime import datetime, time
+from typing import Callable
 
 from vnpy_ctastrategy import CtaTemplate
 from vnpy_ctastrategy.base import StopOrder, StopOrderStatus
@@ -17,16 +17,16 @@ from vnpy.trader.utility import BarGenerator, ArrayManager
 
 
 #%%
-class OscillatorRealTrading(CtaTemplate):
+class OscillatorHNPapertest(CtaTemplate):
     """"""
     author = "Huang Ning"
 
-    boll_window = 30
-    boll_dev = 4
-    atr_window = 16
+    boll_window = 3
+    boll_dev = 10
+    atr_window = 12
     risk_level = 50
-    sl_multiplier = 5.699
-    dis_open = 10
+    sl_multiplier = 6.299999999999994
+    dis_open = 4
     interval = 2
 
     boll_up = 0
@@ -71,20 +71,26 @@ class OscillatorRealTrading(CtaTemplate):
         self.am = ArrayManager()
 
         self.liq_price = 0
-
         self.trading_size = 0
 
         self.on_bar_time = time1(0, 0)
-        self.day_clearance_time = time1(14, 57)
-        self.day_liq_time = time1(14, 59)
-        # self.night_clearance_time = time1(22, 57)
-        # self.night_liq_time = time1(22, 59)
+        self.clearance_time = time1(14, 57)  # 清仓开始时间
+        self.liq_time = time1(14, 59)  # 交易所结算开始时间
 
         self.day_clearance = False
-        # self.night_clearance = False
+
+        self.buy_svt_orderids = []
+        self.sell_svt_orderids = []
+        self.short_svt_orderids = []
+        self.cover_svt_orderids = []
+
+        self.sell_lvt_orderids = []
+        self.cover_lvt_orderids = []
 
         self.path = Path.cwd()
         self.trade_record_dict = {}
+
+        self.count = 0
 
         trade_record_fields = [
             "vt_symbol",
@@ -95,12 +101,11 @@ class OscillatorRealTrading(CtaTemplate):
             "price",
             "volume",
             "datetime",
-            "strategy-name",
             "strategy"
         ]
 
-        self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"trade_reord_table.xlsx")
-        self.trade_record_wb.iso_dates = True  # excel表格可以兼容datetime格式
+        self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
+        self.trade_record_wb.iso_dates = True
 
         sheet_names = self.trade_record_wb.sheetnames
         
@@ -116,7 +121,7 @@ class OscillatorRealTrading(CtaTemplate):
 
         self.trade_record_sheet.freeze_panes = "A2"
 
-        self.trade_record_wb.save(self.path/"strategies"/"trade_reord_table.xlsx")
+        self.trade_record_wb.save(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
 
     def on_init(self):
         """"""
@@ -151,7 +156,7 @@ class OscillatorRealTrading(CtaTemplate):
         """"""
 
         self.liq_price = bar.close_price
-        self.on_bar_time = bar.datetime.time()  # 这两行代码一定不能放到self.bg.update_bar(bar)之后
+        self.on_bar_time = bar.datetime.time()
 
         if datetime.today().isoweekday() <=4:
             self.day_clearance = (self.clearance_time <= self.on_bar_time <= self.liq_time)
@@ -160,36 +165,41 @@ class OscillatorRealTrading(CtaTemplate):
                 (self.clearance_time <= self.on_bar_time <= self.liq_time)
                 or (time(22, 57) <= self.on_bar_time <= time(22, 59))
                 )
-        
-        self.bg.update_bar(bar)
 
-        self.day_clearance = (self.day_clearance_time <= self.on_bar_time <= self.day_liq_time)
-        # self.night_clearance = (self.night_clearance_time <= self.on_bar_time <= self.night_liq_time)
+        self.bg.update_bar(bar)
 
         if self.day_clearance:
 
             self.write_log(f"clearance time, on_bar_time:{self.on_bar_time}")
 
-            if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
+            if not self.buy_svt_orderids and not self.short_svt_orderids\
+                and not self.sell_svt_orderids and not self.cover_svt_orderids\
+                    and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
 
-                pos = copy.deepcopy(self.pos)
-                self.write_log(f"clearance time, no previous commission, self.pos:{pos}")
+                    pos = copy.deepcopy(self.pos)
+                    self.write_log(f"clearance time, no previous commission, self.pos:{pos}")
 
-                if self.pos > 0:
-                    self.sell(self.liq_price - 5, abs(self.pos))
-                    self.write_log(f"clearance time, on_bar, sell volume:{pos} {self.on_bar_time}")
+                    if self.pos > 0:
+                        self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
+                        self.write_log(f"clearance time, on_bar, sell volume:{pos} {self.on_bar_time}")
 
-                elif self.pos < 0:
-                    self.cover(self.liq_price + 5, abs(self.pos))
-                    self.write_log(f"clearance time, on_bar, cover volume:{pos} {self.on_bar_time}")
+                    elif self.pos < 0:
+                        self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
+                        self.write_log(f"clearance time, on_bar, cover volume:{pos} {self.on_bar_time}")
 
             else:
-                orders_buf = copy.deepcopy(self.cta_engine.strategy_orderid_map[self.strategy_name])
+                for buf_orderids in [
+                    self.buy_svt_orderids,
+                    self.sell_svt_orderids,
+                    self.short_svt_orderids,
+                    self.cover_svt_orderids,
+                    self.sell_lvt_orderids,
+                    self.cover_lvt_orderids]:
 
-                if orders_buf:
-                    for vt_orderid in orders_buf:
-                        self.cancel_order(vt_orderid)
-                        self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
+                    if buf_orderids:
+                        for vt_orderid in buf_orderids:
+                            self.cancel_order(vt_orderid)
+                            self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
 
     def on_xmin_bar(self, bar: BarData):
         """"""
@@ -212,49 +222,65 @@ class OscillatorRealTrading(CtaTemplate):
 
             self.write_log(f"on_xmin_bar, self.pos:{pos}, on_bar_time:{self.on_bar_time}")
 
-            if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
-                if self.pos == 0:
+            if self.pos == 0:
 
-                    self.trading_size = max(int(self.risk_level / self.atr_value), 1)
-                    self.write_log(f"on_xmin_bar, risk_level:{self.risk_level}, atr_value:{self.atr_value}, trading_size:{self.trading_size}")
+                self.trading_size = max(int(self.risk_level / self.atr_value), 1)
+                self.write_log(f"on_xmin_bar, risk_level:{self.risk_level}, atr_value:{self.atr_value}, trading_size:{self.trading_size}")
+                
+                if self.trading_size > 6:
+                    self.trading_size = 6
+
+                self.intra_trade_high = bar.high_price
+                self.intra_trade_low = bar.low_price
+
+                if not self.buy_svt_orderids and not self.short_svt_orderids:
                     
-                    if self.trading_size > 6:
-                        self.trading_size = 6
-
-                    self.intra_trade_high = bar.high_price
-                    self.intra_trade_low = bar.low_price
-
                     if self.ultosc > self.buy_dis:
-                        self.buy(self.boll_up, self.trading_size, True)
-                        self.write_log(f"on_xmin_bar, buy_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
+                        self.buy_svt_orderids = self.buy(self.boll_up, self.trading_size, True)
+                        self.write_log(f"on_xmin_bar, buy_svt:{self.buy_svt_orderids}, volume:{self.trading_size}")
 
                     elif self.ultosc < self.short_dis:
-                        self.short(self.boll_down, self.trading_size, True)
-                        self.write_log(f"on_xmin_bar, short_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
-
-                elif self.pos > 0:
-                    self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
-                    self.intra_trade_low = bar.low_price
-
-                    self.long_stop = self.intra_trade_high - self.atr_value * self.sl_multiplier
-
-                    self.sell(self.long_stop, abs(self.pos), True)
-                    self.write_log(f"on_xmin_bar, sell_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
+                        self.short_svt_orderids = self.short(self.boll_down, self.trading_size, True)
+                        self.write_log(f"on_xmin_bar, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
 
                 else:
-                    self.intra_trade_high = bar.high_price
-                    self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
+                    if self.buy_svt_orderids:
+                        for vt_orderid in self.buy_svt_orderids:
+                            self.cancel_order(vt_orderid)
+                            self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
-                    self.short_stop = self.intra_trade_low + self.atr_value * self.sl_multiplier
+                    if self.short_svt_orderids:
+                        for vt_orderid in self.short_svt_orderids:
+                            self.cancel_order(vt_orderid)
+                            self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
-                    self.cover(self.short_stop, abs(self.pos), True)
-                    self.write_log(f"on_xmin_bar, cover_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
+            elif self.pos > 0:
+                self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
+                self.intra_trade_low = bar.low_price
+
+                self.long_stop = self.intra_trade_high - self.atr_value * self.sl_multiplier
+
+                if not self.sell_svt_orderids:
+                    self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
+                    self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
+
+                else:
+                    for vt_orderid in self.sell_svt_orderids:
+                        self.cancel_order(vt_orderid)
+                        self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
             else:
-                orders_buf = copy.deepcopy(self.cta_engine.strategy_orderid_map[self.strategy_name])
+                self.intra_trade_high = bar.high_price
+                self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
 
-                if orders_buf:
-                    for vt_orderid in orders_buf:
+                self.short_stop = self.intra_trade_low + self.atr_value * self.sl_multiplier
+
+                if not self.cover_svt_orderids:
+                    self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
+                    self.write_log(f"on_xmin_bar, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
+
+                else:
+                    for vt_orderid in self.cover_svt_orderids:
                         self.cancel_order(vt_orderid)
                         self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
@@ -267,50 +293,66 @@ class OscillatorRealTrading(CtaTemplate):
         on_stop_order_time = datetime.now().time()
 
         self.write_log(f"on_stop_order, {stop_order.stop_orderid} {stop_order.status} {stop_order.offset} {stop_order.direction}, on_stop_order_time:{on_stop_order_time}")
-
+        
         if stop_order.status == StopOrderStatus.WAITING:
             return
 
+        for buf_orderids in [
+            self.buy_svt_orderids,
+            self.sell_svt_orderids,
+            self.short_svt_orderids,
+            self.cover_svt_orderids]:
+            
+            if stop_order.stop_orderid in buf_orderids:
+                buf_orderids.remove(stop_order.stop_orderid)
+
         if stop_order.status == StopOrderStatus.CANCELLED:
-        
+
             if not self.day_clearance:
 
-                if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
+                if self.pos == 0:
 
-                    if self.pos == 0:
+                    if not self.buy_svt_orderids and not self.short_svt_orderids:
+
                         if self.ultosc > self.buy_dis:
-                            self.buy(self.boll_up, self.trading_size, True)
-                            self.write_log(f"on_stop_order, buy_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
+                            self.buy_svt_orderids = self.buy(self.boll_up, self.trading_size, True)
+                            self.write_log(f"on_stop_order, buy_svt:{self.buy_svt_orderids}, volume:{self.trading_size}")
 
                         elif self.ultosc < self.short_dis:
-                            self.short(self.boll_down, self.trading_size, True)
-                            self.write_log(f"on_stop_order, short_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
+                            self.short_svt_orderids = self.short(self.boll_down, self.trading_size, True)
+                            self.write_log(f"on_stop_order, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
 
-                    elif self.pos > 0:
-                        pos = copy.deepcopy(self.pos)
+                elif self.pos > 0:
+                    
+                    pos = copy.deepcopy(self.pos)
 
-                        self.sell(self.long_stop, abs(self.pos), True)
-                        self.write_log(f"on_stop_order, sell_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
+                    if not self.sell_svt_orderids:
+                        self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
+                        self.write_log(f"on_stop_order, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
 
-                    else:
-                        pos = copy.deepcopy(self.pos)
+                else:
 
-                        self.cover(self.short_stop, abs(self.pos), True)
-                        self.write_log(f"on_stop_order, cover_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
+                    pos = copy.deepcopy(self.pos)
 
+                    if not self.cover_svt_orderids:  
+                        self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
+                        self.write_log(f"on_stop_order, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
             else:
+
                 pos = copy.deepcopy(self.pos)
 
-                if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
+                if not self.buy_svt_orderids and not self.short_svt_orderids\
+                    and not self.sell_svt_orderids and not self.cover_svt_orderids\
+                        and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
+                    
+                        if self.pos > 0:
+                            self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
+                            self.write_log(f"clearance time, on_stop_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
 
-                    if self.pos > 0:
-                        self.sell(self.liq_price - 5, abs(self.pos))
-                        self.write_log(f"clearance time, on_stop_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
-
-                    elif self.pos < 0:
-                        self.cover(self.liq_price + 5, abs(self.pos))
-                        self.write_log(f"clearance time, on_stop_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
-
+                        elif self.pos < 0:
+                            self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
+                            self.write_log(f"clearance time, on_stop_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
+            
         self.put_event()
 
     def on_order(self, order: OrderData):
@@ -320,50 +362,35 @@ class OscillatorRealTrading(CtaTemplate):
 
         self.write_log(f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}")
 
-        # ACTIVE_STATUSES = set([Status.SUBMITTING, Status.NOTTRADED, Status.PARTTRADED])
         if order.is_active():
             return
 
+        for buf_orderids in [
+            self.sell_lvt_orderids,
+            self.cover_lvt_orderids
+            ]:
+
+            if order.orderid in buf_orderids:
+                buf_orderids.remove(order.orderid)    
+ 
         # not ACTIVE_STATUSES = set([Status.ALLTRADED, Status.CANCELLED, Status.REJECTED])
         if order.status in [Status.CANCELLED, Status.REJECTED]:
         
-            if not self.day_clearance:
+            if self.day_clearance:
 
-                if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
-
-                    if self.pos == 0:
-                        if self.ultosc > self.buy_dis:
-                            self.buy(self.boll_up, self.trading_size, True)
-                            self.write_log(f"on_order, buy_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
-
-                        elif self.ultosc < self.short_dis:
-                            self.short(self.boll_down, self.trading_size, True)
-                            self.write_log(f"on_order, short_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{self.trading_size}")
-
-                    elif self.pos > 0:
-                        pos = copy.deepcopy(self.pos)
-
-                        self.sell(self.long_stop, abs(self.pos), True)
-                        self.write_log(f"on_order, sell_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
-
-                    else:
-                        pos = copy.deepcopy(self.pos)
-
-                        self.cover(self.short_stop, abs(self.pos), True)
-                        self.write_log(f"on_order, cover_svt:{list(self.cta_engine.strategy_orderid_map[self.strategy_name])}, volume:{pos}")
-
-            else:
                 pos = copy.deepcopy(self.pos)
 
-                if not self.cta_engine.strategy_orderid_map[self.strategy_name]:
+                if not self.buy_svt_orderids and not self.short_svt_orderids\
+                    and not self.sell_svt_orderids and not self.cover_svt_orderids\
+                        and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
+                        
+                        if self.pos > 0:
+                            self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
+                            self.write_log(f"clearance time, on_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
 
-                    if self.pos > 0:
-                        self.sell(self.liq_price - 5, abs(self.pos))
-                        self.write_log(f"clearance time, on_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
-
-                    elif self.pos < 0:
-                        self.cover(self.liq_price + 5, abs(self.pos))
-                        self.write_log(f"clearance time, on_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
+                        elif self.pos < 0:
+                            self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
+                            self.write_log(f"clearance time, on_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
 
         self.put_event()
 
@@ -378,30 +405,29 @@ class OscillatorRealTrading(CtaTemplate):
         self.cta_engine.main_engine.send_email(subject, msg)
 
         self.trade_record_dict = {
-            "vt_symbol": str(trade.vt_symbol),
-            "orderid": str(trade.orderid),
-            "tradeid": str(trade.tradeid),
+            "vt_symbol": trade.vt_symbol,
+            "orderid": trade.orderid,
+            "tradeid": trade.tradeid,
             "offset": str(trade.offset),
             "direction": str(trade.direction),
-            "price": str(trade.price),
-            "volume": str(trade.volume),
+            "price": trade.price,
+            "volume": trade.volume,
             "datetime": str(trade.datetime),
-            "strategy_name": str(self.strategy_name),
-            "strategy": str(self.cta_engine.strategies[self.strategy_name]) 
+            "strategy": self.strategy_name
         }
 
         # 如果没有明确指定sheet，交易记录会默认保存至第一个sheet
         self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
-        
+
         self.trade_record_sheet.insert_rows(2)
 
         for i in range(1, self.trade_record_sheet.max_column+1):
             column = get_column_letter(i)
             self.trade_record_sheet[column+str(2)] = list(self.trade_record_dict.values())[i-1]
 
-        self.trade_record_wb.save(self.path/"strategies"/"trade_reord_table.xlsx")
+        self.trade_record_wb.save(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
 
-        self.write_log("Trade Record Is Saved")
+        self.write_log(f"{self.strategy_name} Trade Record Is Saved")
 
         self.put_event()
 
@@ -415,7 +441,7 @@ class XminBarGenerator(BarGenerator):
         interval: Interval = Interval.MINUTE
     ):
         super().__init__(on_bar, window, on_window_bar, interval)
-
+    
     def update_bar(self, bar: BarData) ->None:
         """
         Update 1 minute bar into generator
@@ -456,7 +482,7 @@ class XminBarGenerator(BarGenerator):
             # x-minute bar
             # if not (bar.datetime.minute + 1) % self.window:
             #     finished = True
-
+            
             self.interval_count += 1
 
             if not self.interval_count % self.window:
