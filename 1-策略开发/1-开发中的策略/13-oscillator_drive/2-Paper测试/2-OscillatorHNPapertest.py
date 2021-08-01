@@ -143,13 +143,13 @@ class OscillatorHNPapertest(CtaTemplate):
         if self.count <= 10:
             self.write_log(tick)
 
-        # 过滤掉非交易时段收到的tick
+        # 过滤掉非交易时段收到的tick，如果不过滤，Bargenerator将不能合成bar（具体原因见其代码），交易策略将不会发单
         if (
-            (time(9, 0) <= tick.datetime.time() <= time(11, 30))
-            or (time(13, 30) <= tick.datetime.time() <= time(15, 0))
-            or (time(21, 0) <= tick.datetime.time() <= time(23, 0))
+            (time(9, 0) <= tick.datetime.time() < time(11, 31))
+            or (time(13, 30) <= tick.datetime.time() < time(15, 1))
+            or (time(21, 0) <= tick.datetime.time() < time(23, 1))
             ):
-            
+        
             self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
@@ -158,13 +158,7 @@ class OscillatorHNPapertest(CtaTemplate):
         self.liq_price = bar.close_price
         self.on_bar_time = bar.datetime.time()
 
-        if datetime.today().isoweekday() <=4:
-            self.day_clearance = (self.clearance_time <= self.on_bar_time <= self.liq_time)
-        elif datetime.today().isoweekday() == 5:
-            self.day_clearance = (
-                (self.clearance_time <= self.on_bar_time <= self.liq_time)
-                or (time(22, 57) <= self.on_bar_time <= time(22, 59))
-                )
+        self.day_clearance = (self.clearance_time <= self.on_bar_time <= self.liq_time)
 
         self.bg.update_bar(bar)
 
