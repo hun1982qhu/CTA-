@@ -5,7 +5,7 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from pathlib import Path
 from datetime import time as time1
-from datetime import datetime, time
+from datetime import datetime
 from typing import Callable
 
 from vnpy_ctastrategy import CtaTemplate
@@ -144,12 +144,16 @@ class OscillatorHNPapertest(CtaTemplate):
             self.write_log(tick)
 
         # 过滤掉非交易时段收到的tick，如果不过滤，Bargenerator将不能合成bar（具体原因见其代码），交易策略将不会发单
-        if (
-            (time(9, 0) < tick.datetime.time() < time(11, 31))
-            or (time(13, 30) < tick.datetime.time() < time(15, 1))
-            or (time(21, 0) < tick.datetime.time() < time(23, 1))
-            ):
+        # if (
+        #     (time1(9, 0) < tick.datetime.time() < time1(11, 31))
+        #     or (time1(13, 30) < tick.datetime.time() < time1(15, 1))
+        #     or (time1(21, 0) < tick.datetime.time() < time1(23, 1))
+        #     ):
 
+        if (8 < datetime.now().hour < 10) and tick.datetime.time().hour == 23:
+            return
+ 
+        else:
             self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
