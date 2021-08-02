@@ -145,11 +145,11 @@ class OscillatorHNPapertest(CtaTemplate):
 
         # 过滤掉非交易时段收到的tick，如果不过滤，Bargenerator将不能合成bar（具体原因见其代码），交易策略将不会发单
         if (
-            (time(9, 0) <= tick.datetime.time() < time(11, 31))
-            or (time(13, 30) <= tick.datetime.time() < time(15, 1))
-            or (time(21, 0) <= tick.datetime.time() < time(23, 1))
+            (time(9, 0) < tick.datetime.time() < time(11, 31))
+            or (time(13, 30) < tick.datetime.time() < time(15, 1))
+            or (time(21, 0) < tick.datetime.time() < time(23, 1))
             ):
-        
+
             self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
@@ -410,7 +410,7 @@ class OscillatorHNPapertest(CtaTemplate):
             "strategy": self.strategy_name
         }
 
-        # 如果没有明确指定sheet，交易记录会默认保存至第一个sheet
+        self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
         self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
 
         self.trade_record_sheet.insert_rows(2)
@@ -435,19 +435,12 @@ class XminBarGenerator(BarGenerator):
         interval: Interval = Interval.MINUTE
     ):
         super().__init__(on_bar, window, on_window_bar, interval)
-    
-    def update_bar(self, bar: BarData) ->None:
-        """
-        Update 1 minute bar into generator
-        """
-        # If not inited, creaate window bar object
-        if not self.window_bar:
-            # Generate timestamp for bar data
-            if self.interval == Interval.MINUTE:
-                dt = bar.datetime.replace(second=0, microsecond=0)
-            else:
-                dt = bar.datetime.replace(minute=0, second=0, microsecond=0)
 
+    def update_bar_minute_window(self, bar: BarData) -> None:
+        """"""
+        # If not inited, create window bar object
+        if not self.window_bar:
+            dt = bar.datetime.replace(second=0, microsecond=0)
             self.window_bar = BarData(
                 symbol=bar.symbol,
                 exchange=bar.exchange,
@@ -460,9 +453,13 @@ class XminBarGenerator(BarGenerator):
         # Otherwise, update high/low price into window bar
         else:
             self.window_bar.high_price = max(
-                self.window_bar.high_price, bar.high_price)
+                self.window_bar.high_price,
+                bar.high_price
+            )
             self.window_bar.low_price = min(
-                self.window_bar.low_price, bar.low_price)
+                self.window_bar.low_price,
+                bar.low_price
+            )
 
         # Update close price/volume into window bar
         self.window_bar.close_price = bar.close_price
@@ -470,42 +467,23 @@ class XminBarGenerator(BarGenerator):
         self.window_bar.open_interest = bar.open_interest
 
         # Check if window bar completed
+        # if not (bar.datetime.minute + 1) % self.window:
+        #     self.on_window_bar(self.window_bar)
+        #     self.window_bar = None
+
         finished = False
 
-        if self.interval == Interval.MINUTE:
-            # x-minute bar
-            # if not (bar.datetime.minute + 1) % self.window:
-            #     finished = True
-            
-            self.interval_count += 1
+        self.interval_count += 1
 
-            if not self.interval_count % self.window:
+        if not self.interval_count % self.window:
+            finished = True
+            self.interval_count = 0
+            
+        elif bar.datetime.time() in [time1(10, 14), time1(11, 29), time1(14, 59), time1(22, 59)]:
+
+            if bar.exchange in [Exchange.SHFE, Exchange.DCE, Exchange.CZCE]:
                 finished = True
                 self.interval_count = 0
-
-            elif bar.datetime.time() in [time1(10, 14), time1(11, 29), time1(14, 59), time1(22, 59)]:
-                if bar.exchange in [Exchange.SHFE, Exchange.DCE, Exchange.CZCE]:
-                    finished = True
-                    self.interval_count = 0
-
-        elif self.interval == Interval.HOUR:
-            if self.last_bar:
-                new_hour = bar.datetime.hour != self.last_bar.datetime.hour
-                last_minute = bar.datetime.minute == 59
-                not_first = self.window_bar.datetime != bar.datetime
-
-                # To filter duplicate hour bar finished condition
-                if (new_hour or last_minute) and not_first:
-                    # 1-hour bar
-                    if self.window == 1:
-                        finished = True
-                    # x-hour bar
-                    else:
-                        self.interval_count += 1
-
-                        if not self.interval_count % self.window:
-                            finished = True
-                            self.interval_count = 0
 
         if finished:
             self.on_window_bar(self.window_bar)
