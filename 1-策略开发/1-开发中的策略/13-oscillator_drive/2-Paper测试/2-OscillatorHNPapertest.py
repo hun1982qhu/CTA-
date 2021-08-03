@@ -91,6 +91,7 @@ class OscillatorHNPapertest(CtaTemplate):
         self.trade_record_dict = {}
 
         self.count = 0
+        self.count1 = 0
 
         trade_record_fields = [
             "vt_symbol",
@@ -150,7 +151,12 @@ class OscillatorHNPapertest(CtaTemplate):
         #     or (time1(21, 0) < tick.datetime.time() < time1(23, 1))
         #     ):
 
-        if (8 < datetime.now().hour < 10) and tick.datetime.time().hour == 23:
+        if datetime.now().time() < time1(20, 0):
+            if (
+            (time1(9, 0) < tick.datetime.time() < time1(11, 31))
+            or (time1(13, 30) < tick.datetime.time() < time1(15, 1))
+            ):
+
             return
  
         else:
@@ -158,6 +164,13 @@ class OscillatorHNPapertest(CtaTemplate):
 
     def on_bar(self, bar: BarData):
         """"""
+
+        self.count1 += 1
+
+        if self.count1 <= 20:
+            print(f"bar.datetime:{bar.datetime}")
+            print(f"bar.datetime.time:{bar.datetime.time()}")
+
 
         self.liq_price = bar.close_price
         self.on_bar_time = bar.datetime.time()
