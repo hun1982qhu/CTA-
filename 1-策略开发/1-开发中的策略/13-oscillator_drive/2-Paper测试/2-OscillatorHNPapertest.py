@@ -141,7 +141,7 @@ class OscillatorHNPapertest(CtaTemplate):
         """"""
         # 显示策略启动过程中收到的前10个tick
         self.count += 1
-        if self.count <= 10:
+        if self.count <= 30:
             self.write_log(tick)
 
         # 过滤掉非交易时段收到的tick，如果不过滤，Bargenerator将不能合成bar（具体原因见其代码），交易策略将不会发单
@@ -151,15 +151,16 @@ class OscillatorHNPapertest(CtaTemplate):
         #     or (time1(21, 0) < tick.datetime.time() < time1(23, 1))
         #     ):
 
-        if datetime.now().time() < time1(20, 0):
-            if (
-            (time1(9, 0) < tick.datetime.time() < time1(11, 31))
-            or (time1(13, 30) < tick.datetime.time() < time1(15, 1))
-            ):
+        before_20 = datetime.now().time() < time1(20, 0)
+        after_20 = datetime.now().time() >= time1(20, 0)
+        morning_market = (time1(9, 0) < tick.datetime.time() < time1(11, 31))
+        afternoon_market = (time1(13, 30) < tick.datetime.time() < time1(15, 1))
+        night_market = (time1(21, 0) < tick.datetime.time() < time1(23, 1))
 
-            return
- 
-        else:
+        day_trade_time = before_20 and (morning_market or afternoon_market)
+        night_trade_time = after_20 and night_market
+
+        if day_trade_time or night_trade_time:
             self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
