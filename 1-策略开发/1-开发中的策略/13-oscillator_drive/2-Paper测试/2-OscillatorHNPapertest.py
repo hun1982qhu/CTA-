@@ -377,32 +377,31 @@ class OscillatorHNPapertest(CtaTemplate):
         if order.is_active():
             return
 
-        for buf_orderids in [
-            self.sell_lvt_orderids,
-            self.cover_lvt_orderids
-            ]:
+        if self.day_clearance:
 
-            if order.orderid in buf_orderids:
-                buf_orderids.remove(order.orderid)    
- 
-        # not ACTIVE_STATUSES = set([Status.ALLTRADED, Status.CANCELLED, Status.REJECTED])
-        if order.status in [Status.CANCELLED, Status.REJECTED]:
-        
-            if self.day_clearance:
+            for buf_orderids in [self.sell_lvt_orderids, self.cover_lvt_orderids]:
 
-                pos = copy.deepcopy(self.pos)
+                if order.orderid in buf_orderids:
+                    buf_orderids.remove(order.orderid)
+    
+            # not ACTIVE_STATUSES = set([Status.ALLTRADED, Status.CANCELLED, Status.REJECTED])
+            if order.status in [Status.CANCELLED, Status.REJECTED]:
+            
+                if self.day_clearance:
 
-                if not self.buy_svt_orderids and not self.short_svt_orderids\
-                    and not self.sell_svt_orderids and not self.cover_svt_orderids\
-                        and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
-                        
-                        if self.pos > 0:
-                            self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
-                            self.write_log(f"clearance time, on_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
+                    pos = copy.deepcopy(self.pos)
 
-                        elif self.pos < 0:
-                            self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
-                            self.write_log(f"clearance time, on_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
+                    if not self.buy_svt_orderids and not self.short_svt_orderids\
+                        and not self.sell_svt_orderids and not self.cover_svt_orderids\
+                            and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
+                            
+                            if self.pos > 0:
+                                self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
+                                self.write_log(f"clearance time, on_order, sell volume:{pos}, on_bar_time:{self.on_bar_time}")
+
+                            elif self.pos < 0:
+                                self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
+                                self.write_log(f"clearance time, on_order, cover volume:{pos}, on_bar_time:{self.on_bar_time}")
 
         self.put_event()
 
