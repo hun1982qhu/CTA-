@@ -16,6 +16,73 @@ from vnpy.trader.constant import Interval, Exchange, Offset, Status
 from vnpy.trader.utility import BarGenerator, ArrayManager
 
 
+class XminBarGenerator(BarGenerator):
+    def __init__(
+        self,
+        on_bar: Callable,
+        window: int = 0,
+        on_window_bar: Callable = None,
+        interval: Interval = Interval.MINUTE
+    ):
+        super().__init__(on_bar, window, on_window_bar, interval)
+
+    def update_bar_minute_window(self, bar: BarData) -> None:
+        """"""
+        # If not inited, create window bar object
+        if not self.window_bar:
+            dt = bar.datetime.replace(second=0, microsecond=0)
+            self.window_bar = BarData(
+                symbol=bar.symbol,
+                exchange=bar.exchange,
+                datetime=dt,
+                gateway_name=bar.gateway_name,
+                open_price=bar.open_price,
+                high_price=bar.high_price,
+                low_price=bar.low_price
+            )
+        # Otherwise, update high/low price into window bar
+        else:
+            self.window_bar.high_price = max(
+                self.window_bar.high_price,
+                bar.high_price
+            )
+            self.window_bar.low_price = min(
+                self.window_bar.low_price,
+                bar.low_price
+            )
+
+        # Update close price/volume into window bar
+        self.window_bar.close_price = bar.close_price
+        self.window_bar.volume += int(bar.volume)
+        self.window_bar.open_interest = bar.open_interest
+
+        # Check if window bar completed
+        # if not (bar.datetime.minute + 1) % self.window:
+        #     self.on_window_bar(self.window_bar)
+        #     self.window_bar = None
+
+        finished = False
+
+        self.interval_count += 1
+
+        if not self.interval_count % self.window:
+            finished = True
+            self.interval_count = 0
+            
+        elif bar.datetime.time() in [time1(10, 14), time1(11, 29), time1(14, 59), time1(22, 59)]:
+
+            if bar.exchange in [Exchange.SHFE, Exchange.DCE, Exchange.CZCE]:
+                finished = True
+                self.interval_count = 0
+
+        if finished:
+            self.on_window_bar(self.window_bar)
+            self.window_bar = None
+
+        # Cache last bar object
+        self.last_bar = bar
+
+
 #%%
 class OscillatorHNPapertest(CtaTemplate):
     """"""
@@ -336,9 +403,9 @@ class OscillatorHNPapertest(CtaTemplate):
             if stop_order.stop_orderid in buf_orderids:
                 buf_orderids.remove(stop_order.stop_orderid)
 
-        stop_order_isclosed = (stop_order.offset in [Offset.CLOSE, Offset.CLOSETODAY, Offset.CLOSEYESTERDAY])
+        # stop_order_isclosed = (stop_order.offset in [Offset.CLOSE, Offset.CLOSETODAY, Offset.CLOSEYESTERDAY])
 
-        if stop_order_isclosed:
+        # if stop_order_isclosed:
             
 
         if stop_order.status == StopOrderStatus.CANCELLED:
@@ -512,70 +579,3 @@ class OscillatorHNPapertest(CtaTemplate):
 
         # if t > -4:
         #     self.short(price - self.atr_value * 1.5, self.fixed_size, True)
-
-
-class XminBarGenerator(BarGenerator):
-    def __init__(
-        self,
-        on_bar: Callable,
-        window: int = 0,
-        on_window_bar: Callable = None,
-        interval: Interval = Interval.MINUTE
-    ):
-        super().__init__(on_bar, window, on_window_bar, interval)
-
-    def update_bar_minute_window(self, bar: BarData) -> None:
-        """"""
-        # If not inited, create window bar object
-        if not self.window_bar:
-            dt = bar.datetime.replace(second=0, microsecond=0)
-            self.window_bar = BarData(
-                symbol=bar.symbol,
-                exchange=bar.exchange,
-                datetime=dt,
-                gateway_name=bar.gateway_name,
-                open_price=bar.open_price,
-                high_price=bar.high_price,
-                low_price=bar.low_price
-            )
-        # Otherwise, update high/low price into window bar
-        else:
-            self.window_bar.high_price = max(
-                self.window_bar.high_price,
-                bar.high_price
-            )
-            self.window_bar.low_price = min(
-                self.window_bar.low_price,
-                bar.low_price
-            )
-
-        # Update close price/volume into window bar
-        self.window_bar.close_price = bar.close_price
-        self.window_bar.volume += int(bar.volume)
-        self.window_bar.open_interest = bar.open_interest
-
-        # Check if window bar completed
-        # if not (bar.datetime.minute + 1) % self.window:
-        #     self.on_window_bar(self.window_bar)
-        #     self.window_bar = None
-
-        finished = False
-
-        self.interval_count += 1
-
-        if not self.interval_count % self.window:
-            finished = True
-            self.interval_count = 0
-            
-        elif bar.datetime.time() in [time1(10, 14), time1(11, 29), time1(14, 59), time1(22, 59)]:
-
-            if bar.exchange in [Exchange.SHFE, Exchange.DCE, Exchange.CZCE]:
-                finished = True
-                self.interval_count = 0
-
-        if finished:
-            self.on_window_bar(self.window_bar)
-            self.window_bar = None
-
-        # Cache last bar object
-        self.last_bar = bar
