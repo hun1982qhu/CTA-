@@ -11,7 +11,7 @@ from typing import Callable
 from vnpy_ctastrategy import CtaTemplate
 from vnpy_ctastrategy.base import StopOrder, StopOrderStatus
 
-from vnpy.trader.object import TickData, BarData, OrderData, TradeData
+from vnpy.trader.object import TickData, BarData, OrderData, TradeData, Direction
 from vnpy.trader.constant import Interval, Exchange, Status
 from vnpy.trader.utility import BarGenerator, ArrayManager
 
@@ -268,6 +268,9 @@ class OscillatorHNPapertest(CtaTemplate):
                             self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
             elif self.pos > 0:
+
+                self.send_buy_orders(self.boll_up)
+
                 self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
                 self.intra_trade_low = bar.low_price
 
@@ -283,6 +286,9 @@ class OscillatorHNPapertest(CtaTemplate):
                         self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
             else:
+
+                self.send_short_orders(self.boll_down)
+
                 self.intra_trade_high = bar.high_price
                 self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
 
@@ -328,14 +334,15 @@ class OscillatorHNPapertest(CtaTemplate):
                     if not self.buy_svt_orderids and not self.short_svt_orderids:
 
                         if self.ultosc > self.buy_dis:
-                            self.buy_svt_orderids = self.buy(self.boll_up, self.trading_size, True)
+                            self.send_buy_orders(self.boll_up)
                             self.write_log(f"on_stop_order, buy_svt:{self.buy_svt_orderids}, volume:{self.trading_size}")
 
                         elif self.ultosc < self.short_dis:
-                            self.short_svt_orderids = self.short(self.boll_down, self.trading_size, True)
+                            self.send_short_orders(self.boll_down)
                             self.write_log(f"on_stop_order, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
 
                 elif self.pos > 0:
+                    self.send_buy_orders(self.boll_up)
                     
                     pos = copy.deepcopy(self.pos)
 
@@ -409,6 +416,13 @@ class OscillatorHNPapertest(CtaTemplate):
     def on_trade(self, trade: TradeData):
         """"""
 
+        if trade.direction == Direction.LONG:
+            self.long_entry = trade.price
+            self.long_stop = self.long_entry - 2 * self.atr_value
+        else:
+            self.short_entry = trade.price
+            self.short_stop = self.short_entry + 2 * self.atr_value
+
         subject = f"{self.strategy_name} trade notice, trade_time:{trade.datetime}"
         msg = f"trading record:{trade.vt_symbol}\n{trade.orderid}\n{trade.offset}\n{trade.direction}\n{trade.price}\n{trade.volume}\ntrade_time:{trade.datetime}"
         
@@ -442,6 +456,38 @@ class OscillatorHNPapertest(CtaTemplate):
         self.write_log(f"{self.strategy_name} Trade Record Is Saved")
 
         self.put_event()
+
+    def send_buy_orders(self, price):
+        """"""
+        t = self.pos / self.fixed_size
+
+        if t < 1:
+            self.buy(price, self.fixed_size, True)
+
+        if t < 2:
+            self.buy(price + self.atr_value * 0.5, self.fixed_size, True)
+
+        if t < 3:
+            self.buy(price + self.atr_value, self.fixed_size, True)
+
+        if t < 4:
+            self.buy(price + self.atr_value * 1.5, self.fixed_size, True)
+
+    def send_short_orders(self, price):
+        """"""
+        t = self.pos / self.fixed_size
+
+        if t > -1:
+            self.short(price, self.fixed_size, True)
+
+        if t > -2:
+            self.short(price - self.atr_value * 0.5, self.fixed_size, True)
+
+        if t > -3:
+            self.short(price - self.atr_value, self.fixed_size, True)
+
+        if t > -4:
+            self.short(price - self.atr_value * 1.5, self.fixed_size, True)
 
 
 class XminBarGenerator(BarGenerator):
