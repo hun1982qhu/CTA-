@@ -161,13 +161,15 @@ class OscillatorRealTrading(CtaTemplate):
 
         self.buy_lvt_orderids = []
         self.sell_lvt_orderids = []
-        self.shor_lvt_orderids = []
+        self.short_lvt_orderids = []
         self.cover_lvt_orderids = []
 
         self.path = Path.cwd()
         self.trade_record_dict = {}
 
         self.count = 0
+        self.send_buy_count = 0
+        self.send_short_count = 0
 
         trade_record_fields = [
             "vt_symbol",
@@ -307,7 +309,7 @@ class OscillatorRealTrading(CtaTemplate):
                 self.intra_trade_high = bar.high_price
                 self.intra_trade_low = bar.low_price
 
-                if not self.buy_svt_orderids and not self.short_svt_orderids\
+                if not self.buy_svt_orderids and not self.short_svt_orderids \
                     and not self.buy_lvt_orderids and not self.short_lvt_orderids:
                     
                     if self.ultosc > self.buy_dis:
@@ -319,47 +321,53 @@ class OscillatorRealTrading(CtaTemplate):
                         self.write_log(f"on_xmin_bar, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
 
                 else:
-                    if self.buy_svt_orderids:
+
+                    for buf_orderids in [
+                        self.buy_svt_orderids, 
+                        self.short_svt_orderids,
+                        self.buy_lvt_orderids,
+                        self.short_lvt_orderids
+                        ]:
+
+                        if buf_orderids:
+                            for vt_orderid in buf_orderids:
+                                self.cancel_order(vt_orderid)
+                                self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
+
+            elif self.pos > 0:
+
+                pos = copy.deepcopy(self.pos)
+                
+                self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
+                self.intra_trade_low = bar.low_price
+
+                self.long_stop = self.intra_trade_high - self.atr_value * self.sl_multiplier
+                self.long_stop = max(self.long_stop, self.trade_long_stop, self.boll_down)
+                
+                if not self.buy_svt_orderids and not self.sell_svt_orderids \
+                    and not self.buy_lvt_orderids and self.sell_lvt_orderids:
+
+                    self.send_buy_orders(self.boll_up)
+
+                    if not self.sell_svt_orderids:                       
+                        self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
+                        self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
+
+                else:
+
+                    if self.buy_svt_orderids:                                
                         for vt_orderid in self.buy_svt_orderids:
                             self.cancel_order(vt_orderid)
                             self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
-                    if self.short_svt_orderids:
+                    if self.sell_svt_orderids:
                         for vt_orderid in self.short_svt_orderids:
                             self.cancel_order(vt_orderid)
                             self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
-            elif self.pos > 0:
-
-                if not self.buy_svt_orderids:
-
-                    self.send_buy_orders(self.boll_up)
-
-                    self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
-                    self.intra_trade_low = bar.low_price
-
-                    self.long_stop = self.intra_trade_high - self.atr_value * self.sl_multiplier
-                    self.long_stop = max(self.long_stop, self.trade_long_stop, self.boll_down)
-
-                    if not self.sell_svt_orderids:
-                        self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
-                        self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
-
-                    else:
-                        for vt_orderid in self.sell_svt_orderids:
-                            self.cancel_order(vt_orderid)
-                            self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
-
-                else:
-
-                    for vt_orderid in self.buy_svt_orderids:
-                        self.cancel_order(vt_orderid)
-                        self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
-
-
             else:
 
-                self.send_short_orders(self.boll_down)
+                pos = copy.deepcopy(self.pos)
 
                 self.intra_trade_high = bar.high_price
                 self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
@@ -367,14 +375,25 @@ class OscillatorRealTrading(CtaTemplate):
                 self.short_stop = self.intra_trade_low + self.atr_value * self.sl_multiplier
                 self.short_stop = min(self.short_stop, self.trade_short_stop, self.boll_up)
 
-                if not self.cover_svt_orderids:
-                    self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
-                    self.write_log(f"on_xmin_bar, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
+                if not self.short_lvt_orderids and not self.cover_svt_orderids:
+
+                    self.send_short_orders(self.boll_down)
+
+                    if not self.cover_svt_orderids:
+                        self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
+                        self.write_log(f"on_xmin_bar, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
 
                 else:
-                    for vt_orderid in self.cover_svt_orderids:
-                        self.cancel_order(vt_orderid)
-                        self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
+
+                    if self.short_svt_orderids:
+                        for vt_orderid in self.short_svt_orderids:
+                            self.cancel_order(vt_orderid)
+                            self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
+
+                    if self.cover_svt_orderids:
+                        for vt_orderid in self.cover_svt_orderids:
+                            self.cancel_order(vt_orderid)
+                            self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
         self.sync_data()  # 防止出现宕机数据丢失
         self.put_event()
@@ -396,12 +415,7 @@ class OscillatorRealTrading(CtaTemplate):
             self.cover_svt_orderids]:
             
             if stop_order.stop_orderid in buf_orderids:
-                buf_orderids.remove(stop_order.stop_orderid)
-
-        # stop_order_isclosed = (stop_order.offset in [Offset.CLOSE, Offset.CLOSETODAY, Offset.CLOSEYESTERDAY])
-
-        # if stop_order_isclosed:
-            
+                buf_orderids.remove(stop_order.stop_orderid)   
 
         if stop_order.status == StopOrderStatus.CANCELLED:
 
@@ -409,7 +423,8 @@ class OscillatorRealTrading(CtaTemplate):
 
                 if self.pos == 0:
 
-                    if not self.buy_svt_orderids and not self.short_svt_orderids:
+                    if not self.buy_svt_orderids and not self.short_svt_orderids \
+                        and not self.buy_lvt_orderids and not self.short_lvt_orderids:
 
                         if self.ultosc > self.buy_dis:
                             self.send_buy_orders(self.boll_up)
@@ -421,33 +436,34 @@ class OscillatorRealTrading(CtaTemplate):
 
                 elif self.pos > 0:
 
+                    pos = copy.deepcopy(self.pos)
+
                     if not self.buy_svt_orderids:
 
-                        self.send_buy_orders(self.boll_up)
-                        
-                        pos = copy.deepcopy(self.pos)
+                        if self.send_buy_count == 0:
+                            self.send_buy_orders(self.boll_up)
+                            self.send_buy_count += 1
 
                         if not self.sell_svt_orderids:
                             self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
+                            self.send_buy_count = 0
                             self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
-
-                    else:
-
-                        pos = copy.deepcopy(self.pos)
-
-                        if not self.sell_svt_orderids:
-                            self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
-                            self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
-
-                        
 
                 else:
 
                     pos = copy.deepcopy(self.pos)
 
-                    if not self.cover_svt_orderids:  
-                        self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
-                        self.write_log(f"on_stop_order, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
+                    if not self.short_svt_orderids:
+
+                        if self.send_short_count == 0:
+                            self.send_short_orders(self.boll_down)
+                            self.send_short_count += 1
+
+                        if not self.cover_svt_orderids:  
+                            self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
+                            self.send_short_count = 0
+                            self.write_log(f"on_stop_order, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
+
             else:
 
                 pos = copy.deepcopy(self.pos)
@@ -471,14 +487,21 @@ class OscillatorRealTrading(CtaTemplate):
 
         on_order_time = datetime.now().time()
 
-        self.write_log(f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}")
+        msg = f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}"
+
+        self.write_log(msg)
 
         if order.is_active():
             return
 
         if self.day_clearance:
 
-            for buf_orderids in [self.sell_lvt_orderids, self.cover_lvt_orderids]:
+            for buf_orderids in [
+                self.buy_lvt_orderids,
+                self.short_lvt_orderids,
+                self.sell_lvt_orderids, 
+                self.cover_lvt_orderids
+                ]:
 
                 if order.orderid in buf_orderids:
                     buf_orderids.remove(order.orderid)
@@ -486,6 +509,52 @@ class OscillatorRealTrading(CtaTemplate):
             # not ACTIVE_STATUSES = set([Status.ALLTRADED, Status.CANCELLED, Status.REJECTED])
             if order.status in [Status.CANCELLED, Status.REJECTED]:
             
+                if not self.day_clearance:
+
+                    if self.pos == 0:
+
+                        if not self.buy_svt_orderids and not self.short_svt_orderids \
+                            and not self.buy_lvt_orderids and not self.short_lvt_orderids:
+
+                            if self.ultosc > self.buy_dis:
+                                self.send_buy_orders(self.boll_up)
+                                self.write_log(f"on_stop_order, buy_svt:{self.buy_svt_orderids}, volume:{self.trading_size}")
+
+                            elif self.ultosc < self.short_dis:
+                                self.send_short_orders(self.boll_down)
+                                self.write_log(f"on_stop_order, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
+
+                    elif self.pos > 0:
+
+                        pos = copy.deepcopy(self.pos)
+
+                        if not self.buy_svt_orderids:
+
+                            if self.send_buy_count == 0:
+                                self.send_buy_orders(self.boll_up)
+                                self.send_buy_count += 1
+
+                            if not self.sell_svt_orderids:
+                                self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
+                                self.send_buy_count = 0
+                                self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
+
+                    else:
+
+                        pos = copy.deepcopy(self.pos)
+
+                        if not self.short_svt_orderids:
+
+                            if self.send_short_count == 0:
+                                self.send_short_orders(self.boll_down)
+                                self.send_short_count += 1
+
+                            if not self.cover_svt_orderids:  
+                                self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
+                                self.send_short_count = 0
+                                self.write_log(f"on_stop_order, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
+                    
+                
                 if self.day_clearance:
 
                     pos = copy.deepcopy(self.pos)
