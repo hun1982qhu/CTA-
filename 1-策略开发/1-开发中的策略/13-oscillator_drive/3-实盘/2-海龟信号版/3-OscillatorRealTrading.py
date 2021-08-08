@@ -83,8 +83,7 @@ class XminBarGenerator(BarGenerator):
         self.last_bar = bar
 
 
-#%%
-class OscillatorHNPapertest(CtaTemplate):
+class OscillatorRealTrading(CtaTemplate):
     """"""
     author = "Huang Ning"
 
@@ -160,7 +159,9 @@ class OscillatorHNPapertest(CtaTemplate):
         self.short_svt_orderids = []
         self.cover_svt_orderids = []
 
+        self.buy_lvt_orderids = []
         self.sell_lvt_orderids = []
+        self.shor_lvt_orderids = []
         self.cover_lvt_orderids = []
 
         self.path = Path.cwd()
@@ -218,13 +219,6 @@ class OscillatorHNPapertest(CtaTemplate):
         self.count += 1
         if self.count <= 30:
             self.write_log(tick)
-
-        # 过滤掉非交易时段收到的tick，如果不过滤，Bargenerator将不能合成bar（具体原因见其代码），交易策略将不会发单
-        # if (
-        #     (time1(9, 0) < tick.datetime.time() < time1(11, 31))
-        #     or (time1(13, 30) < tick.datetime.time() < time1(15, 1))
-        #     or (time1(21, 0) < tick.datetime.time() < time1(23, 1))
-        #     ):
 
         before_20 = datetime.now().time() < time1(20, 0)
         after_20 = datetime.now().time() >= time1(20, 0)
@@ -313,7 +307,8 @@ class OscillatorHNPapertest(CtaTemplate):
                 self.intra_trade_high = bar.high_price
                 self.intra_trade_low = bar.low_price
 
-                if not self.buy_svt_orderids and not self.short_svt_orderids:
+                if not self.buy_svt_orderids and not self.short_svt_orderids\
+                    and not self.buy_lvt_orderids and not self.short_lvt_orderids:
                     
                     if self.ultosc > self.buy_dis:
                         self.send_buy_orders(self.boll_up)
