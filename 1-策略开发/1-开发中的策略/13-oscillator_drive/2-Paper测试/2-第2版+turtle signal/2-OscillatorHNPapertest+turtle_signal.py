@@ -361,7 +361,6 @@ class OscillatorHNPapertest(CtaTemplate):
                         self.cancel_order(vt_orderid)
                         self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
-
             else:
 
                 self.send_short_orders(self.boll_down)
