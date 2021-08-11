@@ -83,7 +83,7 @@ class XminBarGenerator(BarGenerator):
         self.last_bar = bar
 
 
-class OscillatorRealTrading(CtaTemplate):
+class OscillatorTurtleBacktest(CtaTemplate):
     """"""
     author = "Huang Ning"
 
@@ -158,46 +158,44 @@ class OscillatorRealTrading(CtaTemplate):
         self.short_svt_orderids = []
         self.cover_svt_orderids = []
 
-        self.buy_lvt_orderids = []
+        # self.buy_lvt_orderids = []
         self.sell_lvt_orderids = []
-        self.short_lvt_orderids = []
+        # self.short_lvt_orderids = []
         self.cover_lvt_orderids = []
 
-        self.path = Path.cwd()
-        self.trade_record_dict = {}
+        # self.path = Path.cwd()
+        # self.trade_record_dict = {}
 
-        self.tick_count = 0
+        # trade_record_fields = [
+        #     "vt_symbol",
+        #     "orderid",
+        #     "tradeid",
+        #     "offset",
+        #     "direction",
+        #     "price",
+        #     "volume",
+        #     "datetime",
+        #     "strategy"
+        # ]
 
-        trade_record_fields = [
-            "vt_symbol",
-            "orderid",
-            "tradeid",
-            "offset",
-            "direction",
-            "price",
-            "volume",
-            "datetime",
-            "strategy"
-        ]
+        # self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
+        # self.trade_record_wb.iso_dates = True
 
-        self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
-        self.trade_record_wb.iso_dates = True
-
-        sheet_names = self.trade_record_wb.sheetnames
+        # sheet_names = self.trade_record_wb.sheetnames
         
-        if self.strategy_name not in sheet_names:
-            self.trade_record_sheet = self.trade_record_wb.create_sheet(index=0, title=self.strategy_name)
-        else:
-            self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
+        # if self.strategy_name not in sheet_names:
+        #     self.trade_record_sheet = self.trade_record_wb.create_sheet(index=0, title=self.strategy_name)
+        # else:
+        #     self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
 
-        if not self.trade_record_sheet.cell(row=1, column=1).value:
-            for i in range(1, len(trade_record_fields)+1):
-                column = get_column_letter(i)
-                self.trade_record_sheet[column+str(1)] = trade_record_fields[i-1]
+        # if not self.trade_record_sheet.cell(row=1, column=1).value:
+        #     for i in range(1, len(trade_record_fields)+1):
+        #         column = get_column_letter(i)
+        #         self.trade_record_sheet[column+str(1)] = trade_record_fields[i-1]
 
-        self.trade_record_sheet.freeze_panes = "A2"
+        # self.trade_record_sheet.freeze_panes = "A2"
 
-        self.trade_record_wb.save(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
+        # self.trade_record_wb.save(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
 
     def on_init(self):
         """"""
@@ -215,21 +213,21 @@ class OscillatorRealTrading(CtaTemplate):
     def on_tick(self, tick: TickData):
         """"""
         # 显示策略启动过程中收到的前30个tick
-        if self.tick_count <= 30:
-            self.tick_count += 1
-            self.write_log(tick)
+        # if self.tick_count <= 30:
+        #     self.tick_count += 1
+        #     self.write_log(tick)
 
-        before_20 = datetime.now().time() < time1(20, 0)
-        after_20 = datetime.now().time() >= time1(20, 0)
-        morning_market = (time1(9, 0) < tick.datetime.time() < time1(11, 31))
-        afternoon_market = (time1(13, 30) < tick.datetime.time() < time1(15, 1))
-        night_market = (time1(21, 0) < tick.datetime.time() < time1(23, 1))
+        # before_20 = datetime.now().time() < time1(20, 0)
+        # after_20 = datetime.now().time() >= time1(20, 0)
+        # morning_market = (time1(9, 0) < tick.datetime.time() < time1(11, 31))
+        # afternoon_market = (time1(13, 30) < tick.datetime.time() < time1(15, 1))
+        # night_market = (time1(21, 0) < tick.datetime.time() < time1(23, 1))
 
-        day_trade_time = before_20 and (morning_market or afternoon_market)
-        night_trade_time = after_20 and night_market
+        # day_trade_time = before_20 and (morning_market or afternoon_market)
+        # night_trade_time = after_20 and night_market
 
-        if day_trade_time or night_trade_time:
-            self.bg.update_tick(tick)
+        # if day_trade_time or night_trade_time:
+        self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
         """"""
@@ -250,16 +248,16 @@ class OscillatorRealTrading(CtaTemplate):
                     and not self.buy_lvt_orderids and not self.short_lvt_orderids \
                         and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
                         
-                        pos = copy.deepcopy(self.pos)
-                        self.write_log(f"clearance time, no previous commission, self.pos:{pos}")
+                        # pos = copy.deepcopy(self.pos)
+                        # self.write_log(f"clearance time, no previous commission, self.pos:{pos}")
 
                         if self.pos > 0:
-                            self.sell(self.liq_price - 5, abs(self.pos))
-                            self.write_log(f"clearance time, on_bar, sell volume:{pos} {self.on_bar_time}")
+                            self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
+                            # self.write_log(f"clearance time, on_bar, sell volume:{pos} {self.on_bar_time}")
 
                         elif self.pos < 0:
-                            self.cover(self.liq_price + 5, abs(self.pos))
-                            self.write_log(f"clearance time, on_bar, cover volume:{pos} {self.on_bar_time}")
+                            self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
+                            # self.write_log(f"clearance time, on_bar, cover volume:{pos} {self.on_bar_time}")
 
             else:
 
@@ -277,7 +275,7 @@ class OscillatorRealTrading(CtaTemplate):
                     if buf_orderids:                    
                         for vt_orderid in buf_orderids:
                             self.cancel_order(vt_orderid)
-                            self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
+                            # self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
 
     def on_xmin_bar(self, bar: BarData):
         """"""
