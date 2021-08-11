@@ -141,9 +141,9 @@ class OscillatorHNBacktest(CtaTemplate):
     def on_bar(self, bar: BarData):
         """"""
 
-        if bar.datetime.time() > time1(9, 0):
-            print(f"bar.datetime:{bar.datetime}")
-            print(f"bar.datetime.time:{bar.datetime.time()}")
+        # if bar.datetime.time() > time1(9, 0):
+        #     print(f"bar.datetime:{bar.datetime}")
+        #     print(f"bar.datetime.time:{bar.datetime.time()}")
 
         self.liq_price = bar.close_price
         self.on_bar_time = bar.datetime.time()
