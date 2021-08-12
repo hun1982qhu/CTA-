@@ -1,12 +1,13 @@
 #%%
 import copy
 import time
+import datetime
 import openpyxl
 
 from openpyxl.utils import get_column_letter
 from pathlib import Path
 from datetime import time as time1
-from datetime import datetime
+from datetime import datetime as datetime1
 from typing import Callable
 
 from vnpy_ctastrategy import CtaTemplate
@@ -89,13 +90,14 @@ class OscillatorTurtleBacktest(CtaTemplate):
     """"""
     author = "Huang Ning"
 
-    boll_window = 3
+    boll_window = 30
     boll_dev = 10
     atr_window = 12
     risk_level = 50
     sl_multiplier = 6.299999999999994
     dis_open = 4
-    interval = 2
+    interval = 4
+    fixed_size = 1
 
     boll_up = 0
     boll_down = 0
@@ -119,7 +121,8 @@ class OscillatorTurtleBacktest(CtaTemplate):
         "risk_level",
         "sl_multiplier",
         "dis_open",
-        "interval"
+        "interval",
+        "fixed_size"
     ]
 
     variables = [
@@ -160,44 +163,14 @@ class OscillatorTurtleBacktest(CtaTemplate):
         self.short_svt_orderids = []
         self.cover_svt_orderids = []
 
-        # self.buy_lvt_orderids = []
         self.sell_lvt_orderids = []
-        # self.short_lvt_orderids = []
         self.cover_lvt_orderids = []
 
-        # self.path = Path.cwd()
-        # self.trade_record_dict = {}
-
-        # trade_record_fields = [
-        #     "vt_symbol",
-        #     "orderid",
-        #     "tradeid",
-        #     "offset",
-        #     "direction",
-        #     "price",
-        #     "volume",
-        #     "datetime",
-        #     "strategy"
-        # ]
-
-        # self.trade_record_wb = openpyxl.load_workbook(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
-        # self.trade_record_wb.iso_dates = True
-
-        # sheet_names = self.trade_record_wb.sheetnames
-        
-        # if self.strategy_name not in sheet_names:
-        #     self.trade_record_sheet = self.trade_record_wb.create_sheet(index=0, title=self.strategy_name)
-        # else:
-        #     self.trade_record_sheet = self.trade_record_wb[self.strategy_name]
-
-        # if not self.trade_record_sheet.cell(row=1, column=1).value:
-        #     for i in range(1, len(trade_record_fields)+1):
-        #         column = get_column_letter(i)
-        #         self.trade_record_sheet[column+str(1)] = trade_record_fields[i-1]
-
-        # self.trade_record_sheet.freeze_panes = "A2"
-
-        # self.trade_record_wb.save(self.path/"strategies"/"PaperAccount_reord_table.xlsx")
+        # 2021年5月10日有极端行情，收益异常高，不具有普遍参考价值，因此在回测中跳过这一天
+        extreme_date = "2021-05-10"
+        extreme_date = time.strptime(extreme_date, "%Y-%m-%d")
+        year, month, day = extreme_date[:3]
+        self.extreme_date = datetime.date(year, month, day)
 
     def on_init(self):
         """"""
@@ -214,21 +187,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
     def on_tick(self, tick: TickData):
         """"""
-        # 显示策略启动过程中收到的前30个tick
-        # if self.tick_count <= 30:
-        #     self.tick_count += 1
-        #     self.write_log(tick)
-
-        # before_20 = datetime.now().time() < time1(20, 0)
-        # after_20 = datetime.now().time() >= time1(20, 0)
-        # morning_market = (time1(9, 0) < tick.datetime.time() < time1(11, 31))
-        # afternoon_market = (time1(13, 30) < tick.datetime.time() < time1(15, 1))
-        # night_market = (time1(21, 0) < tick.datetime.time() < time1(23, 1))
-
-        # day_trade_time = before_20 and (morning_market or afternoon_market)
-        # night_trade_time = after_20 and night_market
-
-        # if day_trade_time or night_trade_time:
         self.bg.update_tick(tick)
 
     def on_bar(self, bar: BarData):
@@ -236,23 +194,15 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
         self.liq_price = bar.close_price
         self.on_bar_time = bar.datetime.time()
-        self.on_bar_date = bar.datetime.date()
-
-        # 2021年5月10日有极端行情，收益异常高，不具有普遍参考价值，因此在回测中跳过这一天
-        extreme_date = "2021-05-10"
-        extreme_date = time.strptime(extreme_date, "%Y-%m-%d")
-        year, month, day = extreme_date[:3]
-        extreme_date = datetime.date(year, month, day)
+        on_bar_date = bar.datetime.date()
 
         self.day_clearance = (self.clearance_time <= self.on_bar_time <= self.liq_time)
 
-        if self.on_bar_date != extreme_date:
+        if on_bar_date != self.extreme_date:
 
             self.bg.update_bar(bar)
 
             if self.day_clearance:
-
-                # self.write_log(f"clearance time, on_bar_time:{self.on_bar_time}")
 
                 if not self.buy_svt_orderids and not self.short_svt_orderids \
                     and not self.sell_svt_orderids and not self.cover_svt_orderids \
@@ -284,6 +234,11 @@ class OscillatorTurtleBacktest(CtaTemplate):
                             for vt_orderid in buf_orderids:
                                 self.cancel_order(vt_orderid)
                                 # self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
+        # else:
+        #     print(f"bar.datetime:{bar.datetime}")
+        #     print(f"on_bar_time:{self.on_bar_time}")
+        #     print(f"on_bar_date:{on_bar_date}")
+        #     print(f"extreme_date:{self.extreme_date}")
 
     def on_xmin_bar(self, bar: BarData):
         """"""
@@ -405,9 +360,9 @@ class OscillatorTurtleBacktest(CtaTemplate):
     def on_stop_order(self, stop_order: StopOrder):
         """"""
 
-        on_stop_order_time = datetime.now().time()
+        # on_stop_order_time = datetime1.now().time()
 
-        self.write_log(f"on_stop_order, {stop_order.stop_orderid} {stop_order.status} {stop_order.offset} {stop_order.direction}, on_stop_order_time:{on_stop_order_time}")
+        # self.write_log(f"on_stop_order, {stop_order.stop_orderid} {stop_order.status} {stop_order.offset} {stop_order.direction}, on_stop_order_time:{on_stop_order_time}")
         
         if stop_order.status == StopOrderStatus.WAITING:
             return
@@ -481,11 +436,11 @@ class OscillatorTurtleBacktest(CtaTemplate):
     def on_order(self, order: OrderData):
         """"""
 
-        on_order_time = datetime.now().time()
+        # on_order_time = datetime1.now().time()
 
-        msg = f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}"
+        # msg = f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}"
 
-        self.write_log(msg)
+        # self.write_log(msg)
 
         if order.status in [Status.SUBMITTING, Status.NOTTRADED, Status.PARTTRADED]:
             return
@@ -621,8 +576,8 @@ engine = BacktestingEngine()
 engine.set_parameters(
     vt_symbol="rb888.SHFE",
     interval="1m",
-    start=datetime(2021, 1, 1),
-    end=datetime(2021, 7, 26),
+    start=datetime1(2021, 1, 1),
+    end=datetime1(2021, 6, 30),
     rate=0.0001,
     slippage=0.2,
     size=10,
