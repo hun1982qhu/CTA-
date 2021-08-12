@@ -90,14 +90,14 @@ class OscillatorTurtleBacktest(CtaTemplate):
     """"""
     author = "Huang Ning"
 
-    boll_window = 30
-    boll_dev = 10
-    atr_window = 12
+    boll_window = 57
+    boll_dev = 4
+    atr_window = 4
     risk_level = 50
-    sl_multiplier = 6.299999999999994
-    dis_open = 4
-    interval = 4
-    fixed_size = 1
+    sl_multiplier = 4.8999999999999995
+    dis_open = 2
+    interval = 10
+    fixed_size = 2
 
     boll_up = 0
     boll_down = 0
@@ -166,11 +166,15 @@ class OscillatorTurtleBacktest(CtaTemplate):
         self.sell_lvt_orderids = []
         self.cover_lvt_orderids = []
 
+        self.extreme_date_list = []
+
         # 2021年5月10日有极端行情，收益异常高，不具有普遍参考价值，因此在回测中跳过这一天
-        extreme_date = "2021-05-10"
-        extreme_date = time.strptime(extreme_date, "%Y-%m-%d")
-        year, month, day = extreme_date[:3]
-        self.extreme_date = datetime.date(year, month, day)
+        extreme_date_list = ["2021-05-10", "2021-05-19", "2021-05-20"]
+        for date in extreme_date_list:
+            extreme_date = time.strptime(date, "%Y-%m-%d")
+            year, month, day = extreme_date[:3]
+            extreme_date = datetime.date(year, month, day)
+            self.extreme_date_list.append(extreme_date)
 
     def on_init(self):
         """"""
@@ -192,13 +196,14 @@ class OscillatorTurtleBacktest(CtaTemplate):
     def on_bar(self, bar: BarData):
         """"""
 
+        on_bar_date = bar.datetime.date()
+
         self.liq_price = bar.close_price
         self.on_bar_time = bar.datetime.time()
-        on_bar_date = bar.datetime.date()
 
         self.day_clearance = (self.clearance_time <= self.on_bar_time <= self.liq_time)
 
-        if on_bar_date != self.extreme_date:
+        if on_bar_date not in self.extreme_date_list:
 
             self.bg.update_bar(bar)
 
@@ -207,17 +212,12 @@ class OscillatorTurtleBacktest(CtaTemplate):
                 if not self.buy_svt_orderids and not self.short_svt_orderids \
                     and not self.sell_svt_orderids and not self.cover_svt_orderids \
                         and not self.sell_lvt_orderids and not self.cover_lvt_orderids:
-                            
-                        # pos = copy.deepcopy(self.pos)
-                        # self.write_log(f"clearance time, no previous commission, self.pos:{pos}")
 
                         if self.pos > 0:
                             self.sell_lvt_orderids = self.sell(self.liq_price - 5, abs(self.pos))
-                            # self.write_log(f"clearance time, on_bar, sell volume:{pos} {self.on_bar_time}")
 
                         elif self.pos < 0:
                             self.cover_lvt_orderids = self.cover(self.liq_price + 5, abs(self.pos))
-                            # self.write_log(f"clearance time, on_bar, cover volume:{pos} {self.on_bar_time}")
 
                 else:
 
@@ -233,7 +233,7 @@ class OscillatorTurtleBacktest(CtaTemplate):
                         if buf_orderids:                    
                             for vt_orderid in buf_orderids:
                                 self.cancel_order(vt_orderid)
-                                # self.write_log(f"clearance time, on_bar, cancel {vt_orderid}")
+
         # else:
         #     print(f"bar.datetime:{bar.datetime}")
         #     print(f"on_bar_time:{self.on_bar_time}")
@@ -257,10 +257,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
         if not self.day_clearance:
 
-            pos = copy.deepcopy(self.pos)
-
-            # self.write_log(f"on_xmin_bar, self.pos:{pos}, on_bar_time:{self.on_bar_time}")
-
             if self.pos == 0:
 
                 # self.trading_size = max(int(self.risk_level / self.atr_value), 1)
@@ -273,15 +269,12 @@ class OscillatorTurtleBacktest(CtaTemplate):
                 self.intra_trade_low = bar.low_price
 
                 if not self.buy_svt_orderids and not self.short_svt_orderids:
-                    # and not self.buy_lvt_orderids and not self.short_lvt_orderids:
                     
                     if self.ultosc > self.buy_dis:
                         self.send_buy_orders(self.boll_up)
-                        # self.write_log(f"on_xmin_bar, buy_svt:{self.buy_svt_orderids}, volume:{self.trading_size}")
 
                     elif self.ultosc < self.short_dis:
                         self.send_short_orders(self.boll_down)
-                        # self.write_log(f"on_xmin_bar, short_svt:{self.short_svt_orderids}, volume:{self.trading_size}")
 
                 else:
 
@@ -293,11 +286,9 @@ class OscillatorTurtleBacktest(CtaTemplate):
                         if buf_orderids:
                             for vt_orderid in buf_orderids:
                                 self.cancel_order(vt_orderid)
-                                self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
+                                # self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
             elif self.pos > 0:
-
-                pos = copy.deepcopy(self.pos)
                 
                 self.intra_trade_high = max(self.intra_trade_high, bar.high_price)
                 self.intra_trade_low = bar.low_price
@@ -310,7 +301,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
                     self.send_buy_orders(self.boll_up)
                    
                     self.sell_svt_orderids = self.sell(self.long_stop, abs(self.pos), True)
-                    # self.write_log(f"on_xmin_bar, sell_svt:{self.sell_svt_orderids}, volume:{pos}")
 
                 else:                            
 
@@ -323,11 +313,9 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
                             for vt_orderid in buf_orderids:
                                 self.cancel_order(vt_orderid)
-                                self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
+                                # self.write_log(f"on_xmin_bar, cancel {vt_orderid}")
 
             else:
-
-                pos = copy.deepcopy(self.pos)
 
                 self.intra_trade_high = bar.high_price
                 self.intra_trade_low = min(self.intra_trade_low, bar.low_price)
@@ -340,7 +328,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
                     self.send_short_orders(self.boll_down)
 
                     self.cover_svt_orderids = self.cover(self.short_stop, abs(self.pos), True)
-                    # self.write_log(f"on_xmin_bar, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
 
                 else:
 
@@ -360,9 +347,7 @@ class OscillatorTurtleBacktest(CtaTemplate):
     def on_stop_order(self, stop_order: StopOrder):
         """"""
 
-        # on_stop_order_time = datetime1.now().time()
-
-        # self.write_log(f"on_stop_order, {stop_order.stop_orderid} {stop_order.status} {stop_order.offset} {stop_order.direction}, on_stop_order_time:{on_stop_order_time}")
+        # self.write_log(f"on_stop_order, {stop_order.stop_orderid} {stop_order.status} {stop_order.offset} {stop_order.direction}, on_stop_order_time:{stop_order.datetime}")
         
         if stop_order.status == StopOrderStatus.WAITING:
             return
@@ -374,7 +359,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
             self.cover_svt_orderids]:
             
             if stop_order.stop_orderid in buf_orderids:
-                # self.write_log(f"on_stop_order, {stop_order.stop_orderid} is removed from {buf_orderids}")
                 buf_orderids.remove(stop_order.stop_orderid)   
 
         if stop_order.status == StopOrderStatus.CANCELLED:
@@ -395,8 +379,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
                 elif self.pos > 0:
 
-                    pos = copy.deepcopy(self.pos)
-
                     if not self.buy_svt_orderids and not self.sell_svt_orderids:
 
                             self.send_buy_orders(self.boll_up)
@@ -406,8 +388,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
 
                 else:
 
-                    pos = copy.deepcopy(self.pos)
-
                     if not self.short_svt_orderids and not self.cover_svt_orderids:
 
                         self.send_short_orders(self.boll_down)
@@ -416,8 +396,6 @@ class OscillatorTurtleBacktest(CtaTemplate):
                         # self.write_log(f"on_stop_order, cover_svt:{self.cover_svt_orderids}, volume:{pos}")
 
             else:
-
-                pos = copy.deepcopy(self.pos)
 
                 if not self.buy_svt_orderids and not self.short_svt_orderids \
                     and not self.sell_svt_orderids and not self.cover_svt_orderids \
@@ -436,9 +414,7 @@ class OscillatorTurtleBacktest(CtaTemplate):
     def on_order(self, order: OrderData):
         """"""
 
-        # on_order_time = datetime1.now().time()
-
-        # msg = f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{on_order_time}"
+        # msg = f"on_order, {order.orderid} {order.status} {order.offset} {order.direction}, on_order_time:{order.datetime}"
 
         # self.write_log(msg)
 
@@ -532,17 +508,17 @@ class OscillatorTurtleBacktest(CtaTemplate):
         if t < 3:
             self.buy_svt_orderids = self.buy(price + self.atr_value, self.fixed_size, True)
 
-        if t < 4:
+        if t < 3.5:
             self.buy_svt_orderids = self.buy(price + self.atr_value * 1.5, self.fixed_size, True)
 
-        if t < 5:
-            self.buy_svt_orderids = self.buy(price + self.atr_value * 2, self.fixed_size, True)
+        # if t < 5:
+        #     self.buy_svt_orderids = self.buy(price + self.atr_value * 2, self.fixed_size, True)
 
-        if t < 6:
-            self.buy_svt_orderids = self.buy(price + self.atr_value * 2.5, self.fixed_size, True)
+        # if t < 6:
+        #     self.buy_svt_orderids = self.buy(price + self.atr_value * 2.5, self.fixed_size, True)
 
-        if t < 7:
-            self.buy_svt_orderids = self.buy(price + self.atr_value * 3, self.fixed_size, True)
+        # if t < 7:
+        #     self.buy_svt_orderids = self.buy(price + self.atr_value * 3, self.fixed_size, True)
 
     def send_short_orders(self, price):
         """"""
@@ -557,17 +533,17 @@ class OscillatorTurtleBacktest(CtaTemplate):
         if t > -3:
             self.short_svt_orderids = self.short(price - self.atr_value, self.fixed_size, True)
 
-        if t > -4:
+        if t > -3.5:
             self.short_svt_orderids = self.short(price - self.atr_value * 1.5, self.fixed_size, True)
 
-        if t > -5:
-            self.short_svt_orderids = self.short(price - self.atr_value * 2, self.fixed_size, True)
+        # if t > -5:
+        #     self.short_svt_orderids = self.short(price - self.atr_value * 2, self.fixed_size, True)
 
-        if t > -6:
-            self.short_svt_orderids = self.short(price - self.atr_value * 2.5, self.fixed_size, True)
+        # if t > -6:
+        #     self.short_svt_orderids = self.short(price - self.atr_value * 2.5, self.fixed_size, True)
 
-        if t > -7:
-            self.short_svt_orderids = self.short(price - self.atr_value * 3, self.fixed_size, True)
+        # if t > -7:
+        #     self.short_svt_orderids = self.short(price - self.atr_value * 3, self.fixed_size, True)
 
 
 #%%
@@ -577,7 +553,7 @@ engine.set_parameters(
     vt_symbol="rb888.SHFE",
     interval="1m",
     start=datetime1(2021, 1, 1),
-    end=datetime1(2021, 6, 30),
+    end=datetime1(2021, 4, 30),
     rate=0.0001,
     slippage=0.2,
     size=10,
