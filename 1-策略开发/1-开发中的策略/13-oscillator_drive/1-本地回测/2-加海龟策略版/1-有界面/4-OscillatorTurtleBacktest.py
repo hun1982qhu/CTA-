@@ -97,7 +97,7 @@ class OscillatorTurtleBacktest(CtaTemplate):
     sl_multiplier = 6.299999999999994
     dis_open = 4
     interval = 4
-    fixed_size = 2
+    fixed_size = 1
 
     boll_up = 0
     boll_down = 0
@@ -470,8 +470,17 @@ class OscillatorTurtleBacktest(CtaTemplate):
         if t < 3:
             self.buy_svt_orderids = self.buy(price + self.atr_value, self.fixed_size, True)
 
-        if t < 3.5:
+        if t < 4:
             self.buy_svt_orderids = self.buy(price + self.atr_value * 1.5, self.fixed_size, True)
+
+        if t < 5:
+            self.buy_svt_orderids = self.buy(price + self.atr_value * 2, self.fixed_size, True)
+
+        if t < 6:
+            self.buy_svt_orderids = self.buy(price + self.atr_value * 2.5, self.fixed_size, True)
+
+        if t < 7:
+            self.buy_svt_orderids = self.buy(price + self.atr_value * 3, self.fixed_size, True)
 
 
     def send_short_orders(self, price):
@@ -487,5 +496,14 @@ class OscillatorTurtleBacktest(CtaTemplate):
         if t > -3:
             self.short_svt_orderids = self.short(price - self.atr_value, self.fixed_size, True)
 
-        if t > -3.5:
+        if t > -4:
             self.short_svt_orderids = self.short(price - self.atr_value * 1.5, self.fixed_size, True)
+
+        if t > -5:
+            self.short_svt_orderids = self.short(price - self.atr_value * 2, self.fixed_size, True)
+
+        if t > -6:
+            self.short_svt_orderids = self.short(price - self.atr_value * 2.5, self.fixed_size, True)
+
+        if t > -7:
+            self.short_svt_orderids = self.short(price - self.atr_value * 3, self.fixed_size, True)
