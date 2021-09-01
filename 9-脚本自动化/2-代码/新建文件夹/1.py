@@ -1,6 +1,6 @@
 #%%
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from openpyxl.utils import get_column_letter
 from dataclasses import dataclass
@@ -17,9 +17,15 @@ from vnpy.trader.constant import (Direction, Exchange, Interval, Offset)
 
 
 
+date1 = date(2021, 1, 3)
+date2 = date(2021, 1, 1)
 
+print(date1 - date2)
 
-path = Path.cwd()
-
-print(path)
+if (date1 - date2) > timedelta(days=1):
+    print("True")
+    
+dict1 = defaultdict(list)
+dict1["date1"].append("a")
+print(dict1["date1"])
         

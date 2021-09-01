@@ -1,6 +1,7 @@
 #%%
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
+from datetime import time as time1
 from pathlib import Path
 from openpyxl.utils import get_column_letter
 from dataclasses import dataclass
@@ -82,6 +83,13 @@ class PnlCaculate:
      
         self.pnl_list = []
         self.total_pnl = 0
+        
+        self.trade_date = None
+        
+        self.daily_trades = defaultdict(list)
+        
+        self.day_trade = False
+        self.night_trade = False
 
     def set_parameters(
         self,
@@ -142,15 +150,48 @@ class PnlCaculate:
                     datetime=datetime.strptime(trade_datetime, "%Y-%m-%d %H:%M:%S.%f")
                 )
 
-            print(trade.datetime)
+            if trade.datetime.time() < time1(15, 5):
+                self.day_trade = True
+                self.night_trade = False        
+            elif trade.datetime.time() >= time1(20, 0):
+                self.day_trade = False
+                self.night_trade = True
+
+            d = trade.datetime.date()
+
+            if not self.trade_date and self.day_trade:
+                self.daily_trades[d].append(trade)
+            elif not self.trade_date and self.night_trade:
+                self.daily_trades[d+timedelta(days=1)].append(trade)
+            elif d == self.trade_date and self.day_trade:
+                self.daily_trades[d].append(trade)
+            elif d == self.trade_date and self.night_trade:
+                self.night_trade[d+timedelta(days=1)].append(trade)
+            elif d - self.trade_date == timedelta(days=1) and 
+            
+            self.trade_date = trade.datetime.date()
+            
+            
+            
+            # print(trade.datetime)
+            print(d)
+            print(d+timedelta(days=1))
 
             self.trades[trade.tradeid] = trade
 
     def calculate_result(self):
         """"""
-        # Add trade data into daily reuslt.
+        print("开始计算逐日盯市盈亏")
+        
+        if not self.trades:
+            print("成交记录为空，无法计算")
+            return
         
         for trade in self.trades.values():
+            
+            d = trade.datetime.date()
+            
+            
 
             if trade.direction == "Direction.LONG":
     
@@ -203,3 +244,93 @@ pnl.calculate_result()
 pnl = PnlCaculate("papertest3")
 pnl.get_trade_record()
 pnl.calculate_result()
+
+
+class DailyResult:
+    """"""
+
+    def __init__(self, date: date, close_price: float):
+        """"""
+        self.date = date
+        self.close_price = close_price
+        self.pre_close = 0
+
+        self.trades = []
+        self.trade_count = 0
+
+        self.start_pos = 0
+        self.end_pos = 0
+
+        self.turnover = 0
+        self.commission = 0
+        self.slippage = 0
+
+        self.trading_pnl = 0
+        self.holding_pnl = 0
+        self.total_pnl = 0
+        self.net_pnl = 0
+
+    def add_trade(self, trade: TradeData):
+        """"""
+        self.trades.append(trade)
+
+    def calculate_pnl(
+        self,
+        pre_close: float,
+        start_pos: float,
+        size: int,
+        rate: float,
+        slippage: float,
+        inverse: bool
+    ):
+        """"""
+        
+        
+        # If no pre_close provided on the first day,
+        # use value 1 to avoid zero division error
+        if pre_close:
+            self.pre_close = pre_close
+        else:
+            self.pre_close = 1
+
+        # Holding pnl is the pnl from holding position at day start
+        self.start_pos = start_pos
+        self.end_pos = start_pos
+
+        if not inverse:     # For normal contract
+            self.holding_pnl = self.start_pos * \
+                (self.close_price - self.pre_close) * size
+        else:               # For crypto currency inverse contract
+            self.holding_pnl = self.start_pos * \
+                (1 / self.pre_close - 1 / self.close_price) * size
+
+        # Trading pnl is the pnl from new trade during the day
+        self.trade_count = len(self.trades)
+
+        for trade in self.trades:
+            if trade.direction == Direction.LONG:
+                pos_change = trade.volume
+            else:
+                pos_change = -trade.volume
+
+            self.end_pos += pos_change
+
+            # For normal contract
+            if not inverse:
+                turnover = trade.volume * size * trade.price
+                self.trading_pnl += pos_change * \
+                    (self.close_price - trade.price) * size
+                self.slippage += trade.volume * size * slippage
+            # For crypto currency inverse contract
+            else:
+                turnover = trade.volume * size / trade.price
+                self.trading_pnl += pos_change * \
+                    (1 / trade.price - 1 / self.close_price) * size
+                self.slippage += trade.volume * size * slippage / (trade.price ** 2)
+
+            self.turnover += turnover
+            self.commission += turnover * rate
+
+        # Net pnl takes account of commission and slippage cost
+        self.total_pnl = self.trading_pnl + self.holding_pnl
+        self.net_pnl = self.total_pnl - self.commission - self.slippage

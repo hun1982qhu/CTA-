@@ -6,7 +6,7 @@ from openpyxl.utils import get_column_letter
 from pathlib import Path
 from typing import Callable
 from datetime import time as time1
-from datetime import datetime, time
+from datetime import datetime
 
 from vnpy_ctastrategy import CtaTemplate
 from vnpy_ctastrategy.base import StopOrder, StopOrderStatus
@@ -140,9 +140,9 @@ class OscillatorRealTrading(CtaTemplate):
 
         # 过滤掉非交易时段收到的tick
         if (
-            (time(9, 0) <= tick.datetime.time() <= time(11, 30))
-            or (time(13, 30) <= tick.datetime.time() <= time(15, 0))
-            or (time(21, 0) <= tick.datetime.time() <= time(23, 0))
+            (time1(9, 0) <= tick.datetime.time() <= time1(11, 30))
+            or (time1(13, 30) <= tick.datetime.time() <= time1(15, 0))
+            or (time1(21, 0) <= tick.datetime.time() <= time1(23, 0))
             ):
             
             self.bg.update_tick(tick)
