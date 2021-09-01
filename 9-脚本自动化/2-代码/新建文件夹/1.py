@@ -28,4 +28,7 @@ if (date1 - date2) > timedelta(days=1):
 dict1 = defaultdict(list)
 dict1["date1"].append("a")
 print(dict1["date1"])
+
+dict2 = {1: "a", 2: "b", 3: "c"}
+print(dict2.values())
         

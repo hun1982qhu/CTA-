@@ -87,9 +87,12 @@ class PnlCaculate:
         self.trade_date = None
         
         self.daily_trades = defaultdict(list)
+        self.daily_sum = {}
         
         self.day_trade = False
         self.night_trade = False
+
+        self.daily_pnl = DataFrame()
 
     def set_parameters(
         self,
@@ -159,91 +162,104 @@ class PnlCaculate:
 
             d = trade.datetime.date()
 
-            if not self.trade_date and self.day_trade:
-                self.daily_trades[d].append(trade)
-            elif not self.trade_date and self.night_trade:
-                self.daily_trades[d+timedelta(days=1)].append(trade)
-            elif d == self.trade_date and self.day_trade:
-                self.daily_trades[d].append(trade)
-            elif d == self.trade_date and self.night_trade:
-                self.night_trade[d+timedelta(days=1)].append(trade)
-            elif d - self.trade_date == timedelta(days=1) and 
-            
-            self.trade_date = trade.datetime.date()
-            
-            
-            
-            # print(trade.datetime)
-            print(d)
-            print(d+timedelta(days=1))
-
-            self.trades[trade.tradeid] = trade
-
-    def calculate_result(self):
-        """"""
-        print("开始计算逐日盯市盈亏")
-        
-        if not self.trades:
-            print("成交记录为空，无法计算")
-            return
-        
-        for trade in self.trades.values():
-            
-            d = trade.datetime.date()
-            
-            
-
             if trade.direction == "Direction.LONG":
-    
-                trade_money = trade.price * trade.volume * 10 + trade.volume * 0.1
-
-                self.pnl_list.append(-trade_money)
-
-            elif trade.direction == "Direction.SHORT":
-
+                trade_money = -(trade.price * trade.volume * 10 + trade.volume * 0.1)
+            elif trade.direction == "Direction.SHORT": 
                 trade_money = trade.price * trade.volume * 10 - trade.volume * 0.1
 
-                self.pnl_list.append(trade_money)
+            if not self.trade_date and self.day_trade:
+                self.daily_trades[d].append(trade_money)
+            elif not self.trade_date and self.night_trade:
+                self.daily_trades[d+timedelta(days=1)].append(trade_money)
+            elif d == self.trade_date and self.day_trade:
+                self.daily_trades[d].append(trade_money)
+            elif d == self.trade_date and self.night_trade:
+                self.daily_trades[d+timedelta(days=1)].append(trade_money)
+            else:
+                self.daily_trades[d].append(trade_money)
             
-            # if trade.direction == "Direction.LONG":
+        for key, value in self.daily_trades.items():
+            self.daily_sum[key] = sum(value)
+
+        self.daily_pnl = DataFrame(self.daily_sum, index=[0]).T
+
+        print(self.daily_pnl)
+
+        self.trade_date = trade.datetime.date()
+
+        print("逐日盯市盈亏计算完成")
+            
+        print("开始计算策略统计指标")
+
+            # self.daily_pnl["balance"] = self.daily_pnl[""]
+
+            # self.trades[trade.tradeid] = trade
+
+    # def calculate_result(self):
+    #     """"""
+    #     print("开始计算逐日盯市盈亏")
+        
+    #     if not self.trades:
+    #         print("成交记录为空，无法计算")
+    #         return
+        
+    #     for trade in self.trades.values():
+            
+    #         d = trade.datetime.date()
+            
+            
+
+    #         if trade.direction == "Direction.LONG":
     
-            #     trade_money = (trade.price + 0.2) * trade.volume * 10 + trade.volume * 0.1
+    #             trade_money = trade.price * trade.volume * 10 + trade.volume * 0.1
 
-            #     self.pnl_list.append(-trade_money)
+    #             self.pnl_list.append(-trade_money)
 
-            # elif trade.direction == "Direction.SHORT":
+    #         elif trade.direction == "Direction.SHORT":
 
-            #     trade_money = (trade.price - 0.2) * trade.volume * 10 - trade.volume * 0.1
+    #             trade_money = trade.price * trade.volume * 10 - trade.volume * 0.1
 
-            #     self.pnl_list.append(trade_money)
+    #             self.pnl_list.append(trade_money)
+            
+    #         # if trade.direction == "Direction.LONG":
+    
+    #         #     trade_money = (trade.price + 0.2) * trade.volume * 10 + trade.volume * 0.1
 
-        print(f"self.pnl_list:{self.pnl_list}")
+    #         #     self.pnl_list.append(-trade_money)
 
-        n = len(self.pnl_list)
+    #         # elif trade.direction == "Direction.SHORT":
 
-        # self.total_pnl = sum(self.pnl_list)
-        # print(f"net_profit:{self.total_pnl}")
+    #         #     trade_money = (trade.price - 0.2) * trade.volume * 10 - trade.volume * 0.1
 
-        if (n & 1) == 0:
-            self.total_pnl = sum(self.pnl_list)
-            print(f"net_profit:{self.total_pnl}")
-        else:
-            self.pnl_list.remove(self.pnl_list[0])
-            self.total_pnl = sum(self.pnl_list)
-            print(f"net_profit:{self.total_pnl}")
+    #         #     self.pnl_list.append(trade_money)
+
+    #     print(f"self.pnl_list:{self.pnl_list}")
+
+    #     n = len(self.pnl_list)
+
+    #     # self.total_pnl = sum(self.pnl_list)
+    #     # print(f"net_profit:{self.total_pnl}")
+
+    #     if (n & 1) == 0:
+    #         self.total_pnl = sum(self.pnl_list)
+    #         print(f"net_profit:{self.total_pnl}")
+    #     else:
+    #         self.pnl_list.remove(self.pnl_list[0])
+    #         self.total_pnl = sum(self.pnl_list)
+    #         print(f"net_profit:{self.total_pnl}")
 
 
 pnl = PnlCaculate("papertest1")
 pnl.get_trade_record()
-pnl.calculate_result()
+# pnl.calculate_result()
 
-pnl = PnlCaculate("papertest2")
-pnl.get_trade_record()
-pnl.calculate_result()
+# pnl = PnlCaculate("papertest2")
+# pnl.get_trade_record()
+# pnl.calculate_result()
 
-pnl = PnlCaculate("papertest3")
-pnl.get_trade_record()
-pnl.calculate_result()
+# pnl = PnlCaculate("papertest3")
+# pnl.get_trade_record()
+# pnl.calculate_result()
 
 
 class DailyResult:
