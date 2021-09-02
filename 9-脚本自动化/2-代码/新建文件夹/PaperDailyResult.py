@@ -141,6 +141,8 @@ class PnlCaculate:
 
             trade_datetime = self.trade_record_sheet.cell(i, 8).value
             trade_datetime = trade_datetime.split("+")[0]
+            
+            weekday = datetime.strptime(trade_datetime, "%Y-%m-%d %H:%M:%S.%f").weekday()
 
             trade = TradeData(
                     symbol=self.trade_record_sheet.cell(i, 1).value,
@@ -155,7 +157,7 @@ class PnlCaculate:
 
             if trade.datetime.time() < time1(15, 5):
                 self.day_trade = True
-                self.night_trade = False        
+                self.night_trade = False
             elif trade.datetime.time() >= time1(20, 0):
                 self.day_trade = False
                 self.night_trade = True
@@ -167,18 +169,28 @@ class PnlCaculate:
             elif trade.direction == "Direction.SHORT": 
                 trade_money = trade.price * trade.volume * 10 - trade.volume * 0.1
 
-            if not self.trade_date and self.day_trade:
-                self.daily_trades[d].append(trade_money)
-            elif not self.trade_date and self.night_trade:
-                self.daily_trades[d+timedelta(days=1)].append(trade_money)
-            elif d == self.trade_date and self.day_trade:
-                self.daily_trades[d].append(trade_money)
-            elif d == self.trade_date and self.night_trade:
-                self.daily_trades[d+timedelta(days=1)].append(trade_money)
+            if weekday < 4:
+                if not self.trade_date or d == self.trade_date:
+                    if self.day_trade:
+                        self.daily_trades[d].append(trade_money)
+                    elif self.night_trade:
+                        self.daily_trades[d+timedelta(days=1)].append(trade_money)
+                else:
+                    self.daily_trades[d].append(trade_money)
             else:
-                self.daily_trades[d].append(trade_money)
+                if not self.trade_date or d == self.trade_date:
+                    if self.day_trade:
+                        self.daily_trades[d].append(trade_money)
+                    elif self.night_trade:
+                        self.daily_trades[d+timedelta(days=3)].append(trade_money)
+                else:
+                    self.daily_trades[d].append(trade_money)
             
         for key, value in self.daily_trades.items():
+            if (len(value) & 1) != 0:
+                print("The length of list is odd number")
+                print(value, f"日期为{key}")
+
             self.daily_sum[key] = sum(value)
 
         self.daily_pnl = DataFrame(self.daily_sum, index=[0]).T
