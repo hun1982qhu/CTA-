@@ -31,4 +31,6 @@ print(dict1["date1"])
 
 dict2 = {1: "a", 2: "b", 3: "c"}
 print(dict2.values())
-        
+
+list1 = [1, 2, 3, 4]
+print(list1[:-1])

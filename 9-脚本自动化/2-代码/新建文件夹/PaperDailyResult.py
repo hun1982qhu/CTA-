@@ -188,8 +188,8 @@ class PnlCaculate:
             
         for key, value in self.daily_trades.items():
             if (len(value) & 1) != 0:
-                print("The length of list is odd number")
-                print(value, f"日期为{key}")
+                a = value[0]
+                value
 
             self.daily_sum[key] = sum(value)
 
