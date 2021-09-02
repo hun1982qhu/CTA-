@@ -34,3 +34,6 @@ print(dict2.values())
 
 list1 = [1, 2, 3, 4]
 print(list1[:-1])
+
+path = Path.cwd()
+print(path)

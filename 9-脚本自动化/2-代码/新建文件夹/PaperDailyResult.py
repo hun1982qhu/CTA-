@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from datetime import time as time1
 from pathlib import Path
+from re import T
 from openpyxl.utils import get_column_letter
 from dataclasses import dataclass
 
@@ -11,6 +12,8 @@ from functools import partial
 import openpyxl
 import numpy as np
 from pandas import DataFrame
+import pandas as pd
+from pandas.core.indexes.base import Index
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -94,6 +97,8 @@ class PnlCaculate:
 
         self.daily_pnl = DataFrame()
 
+        self.unfinished_day_trade = 0
+
     def set_parameters(
         self,
         vt_symbol: str,
@@ -124,7 +129,7 @@ class PnlCaculate:
 
     def get_trade_record(self):
         """"""
-        self.trade_record_wb = openpyxl.load_workbook(self.path)
+        self.trade_record_wb = openpyxl.load_workbook("d:/CTA/9-脚本自动化/2-代码/新建文件夹/PaperAccount_reord_table.xlsx")
 
         sheet_names = self.trade_record_wb.sheetnames
         
@@ -188,15 +193,44 @@ class PnlCaculate:
             
         for key, value in self.daily_trades.items():
             if (len(value) & 1) != 0:
-                a = value[0]
-                value
+                if not self.unfinished_day_trade:
+                    self.unfinished_day_trade = value.pop(0)
+                    self.daily_sum[key] = sum(value)
+                else:
+                    self.daily_sum[key] = sum(value) + self.unfinished_day_trade
 
-            self.daily_sum[key] = sum(value)
+            else:              
+                self.daily_sum[key] = sum(value)
+                self.unfinished_day_trade = 0
 
-        self.daily_pnl = DataFrame(self.daily_sum, index=[0]).T
+        self.daily_pnl = DataFrame.from_dict(self.daily_sum, orient='index', columns=["每日盈亏"])
 
-        print(self.daily_pnl)
+        self.daily_pnl.index = pd.to_datetime(self.daily_pnl.index)
 
+        self.daily_pnl.sort_index(ascending=True, inplace=True)
+        # print(self.daily_pnl.index)
+        # print(self.daily_pnl["每日盈亏"])
+
+        # self.daily_pnl = DataFrame(self.daily_sum, index=["date"]).T
+        self.daily_pnl["每日盈亏累计"] = self.daily_pnl["每日盈亏"].cumsum()
+
+        fig = make_subplots(
+            rows=1,
+            cols=1,
+            subplot_titles=["Balance"],
+            vertical_spacing=0.06
+        )
+        
+        balance_line = go.Scatter(
+            x=self.daily_pnl.index,
+            y=self.daily_pnl["每日盈亏累计"],
+            mode="lines",
+            name="Balance"
+        )
+        
+        fig.add_trace(balance_line, row=1, col=1)
+        fig.update_layout(height=1000, width=1000)
+        fig.show()
         self.trade_date = trade.datetime.date()
 
         print("逐日盯市盈亏计算完成")
