@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>940</width>
-    <height>577</height>
+    <width>705</width>
+    <height>477</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,10 +16,10 @@
   <widget class="QLabel" name="LabelHello">
    <property name="geometry">
     <rect>
-     <x>300</x>
-     <y>200</y>
-     <width>201</width>
-     <height>111</height>
+     <x>190</x>
+     <y>150</y>
+     <width>311</width>
+     <height>81</height>
     </rect>
    </property>
    <property name="font">
@@ -30,16 +30,16 @@
     </font>
    </property>
    <property name="text">
-    <string>Hello, by UI Designer</string>
+    <string>         Hello, by UI Designer</string>
    </property>
   </widget>
   <widget class="QPushButton" name="btnClose">
    <property name="geometry">
     <rect>
-     <x>340</x>
-     <y>340</y>
-     <width>80</width>
-     <height>20</height>
+     <x>300</x>
+     <y>280</y>
+     <width>111</width>
+     <height>31</height>
     </rect>
    </property>
    <property name="text">
